@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-playground/validator"
 )
 
@@ -20,7 +20,7 @@ type UpdateUserDetailRequest struct {
 }
 
 func (args *UpdateUserDetailRequest) Parse(r *http.Request) error {
-	strID := chi.URLParam(r, "id")
+	strID := chi.URLParam(r, "userid")
 	intID, err := strconv.Atoi(strID)
 	if err != nil {
 		return err

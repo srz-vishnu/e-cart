@@ -14,6 +14,7 @@ import (
 type UserService interface {
 	SaveUserDetails(r *http.Request) (*dto.SaveUserResponse, error)
 	UpdateUserDetails(r *http.Request) error
+	AddItemToCart(r *http.Request) error
 }
 
 type userServiceImpl struct {
@@ -76,6 +77,29 @@ func (s *userServiceImpl) UpdateUserDetails(r *http.Request) error {
 		return e.NewError(e.ErrCreateUser, "failed to update user details", err)
 	}
 	log.Info().Msg("Succesfully updated user details")
+
+	return nil
+}
+
+func (s *userServiceImpl) AddItemToCart(r *http.Request) error {
+	args := &dto.AddItemToCart{}
+
+	err := args.Parse(r)
+	if err != nil {
+		return e.NewError(e.ErrDecodeRequestBody, "errro while parsing", err)
+	}
+
+	err = args.Validate()
+	if err != nil {
+		return e.NewError(e.ErrDecodeRequestBody, "error validating the req.body", err)
+	}
+	log.Info().Msg("Successfully completed parsing and validation of request body")
+
+	err = s.userRepo.AddItemToCart(args)
+	if err != nil {
+		return e.NewError(e.ErrCreateBook, "failed to add items to the cart", err)
+	}
+	log.Info().Msg("Succesfully added  items to cart")
 
 	return nil
 }

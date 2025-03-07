@@ -23,6 +23,11 @@ func APIRouter(db *gorm.DB) chi.Router {
 	proService := service.NewProductService(proRepo)
 	proController := controller.NewProductController(proService)
 
+	// Admin part
+	adminRepo := internal.NewAdminRepo(db)
+	adminService := service.NewAdminService(adminRepo)
+	adminController := controller.NewAdminController(adminService)
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/hello", api.ExampleHamdler)
 	})
@@ -30,12 +35,27 @@ func APIRouter(db *gorm.DB) chi.Router {
 	//user
 	r.Route("/user", func(r chi.Router) {
 		r.Post("/create", urController.UserDetails)
+		r.Put("/update/{userid}", urController.UpdateUserDetails)
+		r.Post("/cart/additem", urController.AddItemsToCart)
+		//r.Post("/cart", urController.UserDetails)
 	})
 
 	//product
 	r.Route("/product", func(r chi.Router) {
+		// create used to create a product
 		r.Post("/create", proController.CreateProduct)
+		// to view product
+		r.Get("/list/catagory", proController.ListAllProduct)
+		// to view brand
+		r.Get("/list/brand", proController.ListAllBrand)
+		// to see product based on the catagory id given by user
+		r.Get("/search/catagory/{id}", proController.GetCatagoryById)
+	})
 
+	//admin
+	r.Route("/admin", func(r chi.Router) {
+		r.Put("/block/{useridid}", adminController.BlockUser)
+		r.Put("/unblock/{useridid}", adminController.BlockUser)
 	})
 
 	return r

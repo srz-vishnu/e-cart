@@ -3,8 +3,9 @@ module e-cart
 go 1.22.4
 
 require (
-	github.com/go-chi/chi v1.5.5
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/go-chi/chi/v5 v5.2.0
+	//	github.com/go-chi/chi v1.5.5
+	//	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/joho/godotenv v1.5.1
 	github.com/rs/zerolog v1.33.0
@@ -12,6 +13,8 @@ require (
 	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
+
+require github.com/go-chi/chi v1.5.5
 
 require (
 	github.com/go-playground/locales v0.14.1 // indirect
