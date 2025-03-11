@@ -11,6 +11,7 @@ type UserController interface {
 	UserDetails(w http.ResponseWriter, r *http.Request)
 	UpdateUserDetails(w http.ResponseWriter, r *http.Request)
 	AddItemsToCart(w http.ResponseWriter, r *http.Request)
+	PlaceOrder(w http.ResponseWriter, r *http.Request)
 }
 
 type UserControllerImpl struct {
@@ -45,11 +46,21 @@ func (c *UserControllerImpl) UpdateUserDetails(w http.ResponseWriter, r *http.Re
 }
 
 func (c *UserControllerImpl) AddItemsToCart(w http.ResponseWriter, r *http.Request) {
-	err := c.userService.AddItemToCart(r)
+	resp, err := c.userService.AddItemToCart(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to add items to the cart")
 		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
 		return
 	}
-	api.Success(w, http.StatusOK, "resp")
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *UserControllerImpl) PlaceOrder(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.userService.PlaceOrder(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to place the order")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
 }

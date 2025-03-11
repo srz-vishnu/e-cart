@@ -37,7 +37,7 @@ func APIRouter(db *gorm.DB) chi.Router {
 		r.Post("/create", urController.UserDetails)
 		r.Put("/update/{userid}", urController.UpdateUserDetails)
 		r.Post("/cart/additem", urController.AddItemsToCart)
-		//r.Post("/cart", urController.UserDetails)
+		r.Post("/cart/placeorder", urController.PlaceOrder)
 	})
 
 	//product

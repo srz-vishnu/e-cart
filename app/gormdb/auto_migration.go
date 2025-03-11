@@ -21,6 +21,12 @@ func Automigration(db *gorm.DB) error {
 	if err := db.AutoMigrate(&internal.Cart{}); err != nil {
 		log.Fatalf("migration failed for Cart : %v", err)
 	}
+	if err := db.AutoMigrate(&internal.Order{}); err != nil {
+		log.Fatalf("migration failed for order : %v", err)
+	}
+	if err := db.AutoMigrate(&internal.OrderItem{}); err != nil {
+		log.Fatalf("migration failed for order item : %v", err)
+	}
 	log.Println("Migration success")
 	return nil
 }

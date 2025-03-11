@@ -124,10 +124,8 @@ func (r *ProductRepoImpl) CreateAndUpsertProductDetail(args *dto.CreateCategoryD
 				return 0, err
 			}
 		} else {
-			// If  brand exists, update the stock count by adding the new stock count to the existing one
+			// If  brand exists, update the stock count
 			existingBrand.StockCount += cat.StockCount
-
-			// Option
 			existingBrand.Price = cat.Price
 
 			// Update the brand's stock count and price in the database
