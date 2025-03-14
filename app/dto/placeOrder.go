@@ -9,6 +9,7 @@ import (
 
 type PlaceOrderFromCart struct {
 	UserID int64 `json:"userid"`
+	CartID int64 `json:""cartid`
 }
 
 type ItemOrderedResponse struct {

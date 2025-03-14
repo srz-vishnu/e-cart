@@ -134,8 +134,10 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 	for _, catBrand := range allBrandList {
 		brandList := dto.BrandDetailResponse{
 			BrandName:  catBrand.BrandName,
+			BrandId:    catBrand.ID,
 			Price:      catBrand.Price,
 			StockCount: catBrand.StockCount,
+			CategoryID: catBrand.CategoryID,
 		}
 		brandLists = append(brandLists, &brandList)
 		fmt.Printf("brand items %v", brandLists)
@@ -143,7 +145,7 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 
 	// Print each product's details directly
 	for _, brand := range brandLists {
-		fmt.Printf(" Brand name: %s, price: %v, stockcount: %d\n", brand.BrandName, brand.Price, brand.StockCount)
+		fmt.Printf(" Brand name: %s, Brand_Id: %d, price: %v, categoryID: %d  stockcount: %d\n", brand.BrandName, brand.BrandId, brand.Price, brand.CategoryID, brand.StockCount)
 	}
 
 	return brandLists, nil

@@ -8,10 +8,10 @@ import (
 )
 
 type AddItemToCart struct {
-	UserID    int64 `json:"userid"`
-	ProductID int64 `json:"productid"`
-	Quantity  int64 `json:"quantity"`
-	//Price     float64 `json:"price"`
+	UserID     int64 `json:"userid"`
+	CategoryID int64 `json:"category_id"`
+	Quantity   int64 `json:"quantity"`
+	BrandId    int64 `json:"brandid"`
 }
 
 type CartItemResponse struct {

@@ -1,7 +1,9 @@
 package dto
 
 type BrandDetailResponse struct {
-	BrandName  string  `json:"brandname" validate:"required"`
-	Price      float64 `json:"price" validate:"required"`
-	StockCount int64   `json:"stockcount" validate:"required"`
+	BrandName  string  `json:"brandname"`
+	BrandId    int64   `json:"brandid"`
+	Price      float64 `json:"price" `
+	StockCount int64   `json:"stockcount"`
+	CategoryID int64   `json:"category_id"`
 }

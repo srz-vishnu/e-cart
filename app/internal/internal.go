@@ -14,12 +14,15 @@ type UserRepo interface {
 	UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error
 	//	AddItemToCart(args *dto.AddItemToCart) error
 	IsUserActive(userID int64) (bool, error)
-	GetProductDetails(productID, quantity int64) (*Brand, error)
+	GetProductDetails(productID, categoryID, quantity int64) (*Brand, error)
 	CheckProductInCart(userID, productID int64) (*Cart, error)
-	FetchCartItems(userID int64) ([]Cart, error)
-	AddOrUpdateCart(userID int64, product *Brand, quantity int64) (*Cart, error)
+	FetchCartItems(userID, cartID int64) ([]Cart, error)
+	//CartWithProductDetails(UserID, ProductID int64) (*Cart, error)
+	AddOrUpdateCart(userID int64, product *Brand, quantity int64) error
+	GetCartWithProductDetails(userID int64, productID int64) (*Cart, error)
 	CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error)
 	CreateOrderItems(orderID int64, cartItems []Cart) ([]OrderItem, error)
+	UpdateCartOrderStatus(userID, orderID, cartID int64) error
 }
 
 type UserRepoImpl struct {
@@ -48,15 +51,17 @@ type Userdetail struct {
 }
 
 type Cart struct {
-	ID        int64      `gorm:"primaryKey"`
-	UserID    int64      `gorm:"column:user_id;not null"`    // Foreign key to User
-	ProductID int64      `gorm:"column:product_id;not null"` // Foreign key to Brand
-	Quantity  int64      `gorm:"column:quantity;not null;default:1"`
-	Price     float64    `gorm:"column:price;not null"`
-	User      Userdetail `gorm:"foreignKey:UserID;references:ID"`    // Relation to Userdetail table
-	Product   Brand      `gorm:"foreignKey:ProductID;references:ID"` // Relation to Brand (Product) table (ProductID in the currenet table is a foreign key to the table brand, also a table le id anne ID)
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          int64      `gorm:"primaryKey"`
+	UserID      int64      `gorm:"column:user_id;not null"`    // Foreign key to User
+	ProductID   int64      `gorm:"column:product_id;not null"` // Foreign key to Brand
+	Quantity    int64      `gorm:"column:quantity;not null;default:1"`
+	Price       float64    `gorm:"column:price;not null"`
+	OrderStatus bool       `gorm:"column:orderstatus;not null;default:true"` // true if its active , once place cheytha false avanam
+	OrderDetail int64      `gorm:"column:orderdetail;"`                      // orderstatus false akumbol, orderid add cheyanam
+	User        Userdetail `gorm:"foreignKey:UserID;references:ID"`          // Relation to Userdetail table
+	Product     Brand      `gorm:"foreignKey:ProductID;references:ID"`       // Relation to Brand (Product) table (ProductID in the currenet table is a foreign key to the table brand, also a table le id anne ID)
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type Order struct {
@@ -151,20 +156,20 @@ func (r *UserRepoImpl) IsUserActive(userID int64) (bool, error) {
 	return user.Status, nil
 }
 
-func (r *UserRepoImpl) GetProductDetails(productID, quantity int64) (*Brand, error) {
+func (r *UserRepoImpl) GetProductDetails(brandID, categoryID, quantity int64) (*Brand, error) {
 	var product Brand
 
-	if err := r.db.Table("brands").Where("id = ?", productID).First(&product).Error; err != nil {
+	if err := r.db.Table("brands").Where("id = ? AND category_id = ? ", categoryID, brandID).First(&product).Error; err != nil {
 		// If product not found, then GORM error
 		if err == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("product with id %d not found", productID)
+			return nil, fmt.Errorf("product with id %d not found", brandID)
 		}
 		return nil, err
 	}
 
 	// Check if the requested quantity is available in total stock
 	if quantity > product.StockCount {
-		return nil, fmt.Errorf("requested quantity %d exceeds available stock %d for product ID %d", quantity, product.StockCount, productID)
+		return nil, fmt.Errorf("requested quantity %d exceeds available stock %d for product ID %d with Brand ID %d", quantity, product.StockCount, categoryID, brandID)
 	}
 
 	return &product, nil
@@ -185,7 +190,7 @@ func (r *UserRepoImpl) CheckProductInCart(userID, productID int64) (*Cart, error
 	return &cart, nil
 }
 
-func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity int64) (*Cart, error) {
+func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity int64) error {
 	var existingCart Cart
 
 	// Check if the product already exists in the user's cart
@@ -197,62 +202,65 @@ func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity in
 				ProductID: product.ID,
 				Quantity:  quantity,
 				Price:     product.Price,
-				Product: Brand{
-					CategoryID: product.CategoryID,
-					BrandName:  product.BrandName,
-				},
+				// Product: Brand{
+				// 	CategoryID: product.CategoryID,
+				// 	BrandName:  product.BrandName,
+				// },
 			}
 			if err := r.db.Table("carts").Create(&newCart).Error; err != nil {
-				return nil, err
+				return err
 			}
 			// Return the newly created cart item
-			return &newCart, nil
+			return nil
+		} else {
+			return err
 		}
-		// else {
-		// 	return nil, err
-		// }
 	}
 
 	// If product already exists in the cart, update the quantity
 	existingCart.Quantity += quantity
 	if err := r.db.Table("carts").Save(&existingCart).Error; err != nil {
-		return nil, err
+		return err
 	}
 
 	// Return the updated cart item
-	return &existingCart, nil
+	return nil
+}
+
+func (r *UserRepoImpl) GetCartWithProductDetails(userID int64, productID int64) (*Cart, error) {
+	var cart Cart
+
+	// Use Preload to load the related product (Brand) details
+	if err := r.db.Preload("Product").Where("user_id = ? AND product_id = ?", userID, productID).First(&cart).Error; err != nil {
+		return nil, err
+	}
+
+	return &cart, nil
 }
 
 // FetchCartItems retrieves the user's cart items.
-func (r *UserRepoImpl) FetchCartItems(userID int64) ([]Cart, error) {
+func (r *UserRepoImpl) FetchCartItems(userID, cartID int64) ([]Cart, error) {
 	var cartItems []Cart
-	// if err := r.db.Table("carts").Where("user_id = ?", userID).Find(&cartItems).Error; err != nil {
-	// 	return nil, err
-	// }
 
-	if err := r.db.Preload("products").Where("user_id = ?", userID).Find(&cartItems).Error; err != nil {
+	if err := r.db.Table("carts").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
 		return nil, err
 	}
 
 	if len(cartItems) == 0 {
-		return nil, fmt.Errorf("no items in the cart to place an order")
+		return nil, fmt.Errorf("no items in the cart to place an order for the given userID and cartID")
 	}
 
 	return cartItems, nil
 }
 
-// // CreateOrder creates a new order for the user.
-// func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64) (*Order, error) {
-// 	newOrder := &Order{
-// 		UserID: userID,
-// 		Total:  totalAmount,
-// 	}
+// func (r *UserRepoImpl) CartWithProductDetails(UserID, ProductID int64) (*Cart, error) {
+// 	var cart Cart
 
-// 	if err := r.db.Table("orders").Create(newOrder).Error; err != nil {
+// 	// Use Preload to load the related product (Brand) details
+// 	if err := r.db.Preload("Product").Where("user_id = ? AND product_id = ?", UserID, ProductID).First(&cart).Error; err != nil {
 // 		return nil, err
 // 	}
-
-// 	return newOrder, nil
+// 	return &cart, nil
 // }
 
 func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error) {
@@ -317,5 +325,29 @@ func (r *UserRepoImpl) ClearCart(userID int64) error {
 	if err := r.db.Table("carts").Where("user_id = ?", userID).Delete(&Cart{}).Error; err != nil {
 		return err
 	}
+	return nil
+}
+
+// UpdateCartOrder updates the order status to false and adds the order ID to orderdetail
+func (r *UserRepoImpl) UpdateCartOrderStatus(userID, orderID, cartID int64) error {
+	// Create a map for fields to update
+	updates := map[string]interface{}{
+		"OrderStatus": false,
+		"OrderDetail": orderID,
+	}
+
+	// Updating
+	result := r.db.Model(&Cart{}).Where("user_id = ? AND id = ?", userID, cartID).Updates(updates)
+
+	// Check for errors
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Check if rows were affected
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no rows updated")
+	}
+
 	return nil
 }

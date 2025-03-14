@@ -109,17 +109,26 @@ func (s *userServiceImpl) AddItemToCart(r *http.Request) (*dto.CartItemResponse,
 	log.Info().Msg("User is active")
 
 	// getting product price
-	prodDetails, err := s.userRepo.GetProductDetails(args.ProductID, args.Quantity)
+	prodDetails, err := s.userRepo.GetProductDetails(args.CategoryID, args.BrandId, args.Quantity)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateBook, "error while getting product details", err)
 	}
-	log.Info().Msgf("succesfully got product details of product id %v", prodDetails.Price)
+	log.Info().Msgf("succesfully got product details of barnd name %s price %f stock %d", prodDetails.BrandName, prodDetails.Price, prodDetails.StockCount)
 
 	// checking product already exsist in cart, if not adding those items
-	cartData, err := s.userRepo.AddOrUpdateCart(args.UserID, prodDetails, args.Quantity)
+	err = s.userRepo.AddOrUpdateCart(args.UserID, prodDetails, args.Quantity)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateBook, "error while adding items to the cart", err)
 	}
+	log.Info().Msg("Succesfully added items to the cart")
+
+	// Get the updated cart details along with product info
+	cartData, err := s.userRepo.GetCartWithProductDetails(args.UserID, prodDetails.ID)
+	if err != nil {
+		return nil, e.NewError(e.ErrCreateBook, "error while retrieving cart with product details", err)
+	}
+	log.Info().Msgf("succesfully got cart details of barnd name %s price %f stock %d", cartData.Product.BrandName, cartData.Product.Price, cartData.Product.StockCount)
+
 	// Calculate total price
 	totalPrice := float64(cartData.Quantity) * cartData.Price
 	//brand := prodDetails.BrandName
@@ -165,8 +174,8 @@ func (s userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse, 
 	}
 	log.Info().Msg("User is active")
 
-	// fetch cartItems against userId
-	cartItems, err := s.userRepo.FetchCartItems(args.UserID)
+	// fetch cartItems against userId N cartID
+	cartItems, err := s.userRepo.FetchCartItems(args.UserID, args.CartID)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateBook, "error while fetching cart details", err)
 	}
@@ -175,6 +184,7 @@ func (s userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse, 
 	for _, cartItem := range cartItems {
 		log.Info().Msgf("CartID: %d, ProductID: %d, Quantity: %d, Price: %.2f, BrandName: %s", cartItem.ID, cartItem.ProductID, cartItem.Quantity,
 			cartItem.Price, cartItem.Product.BrandName)
+
 	}
 
 	var totalAmount float64
@@ -198,7 +208,6 @@ func (s userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse, 
 		log.Info().Msgf("Item ID: %d, OrderID: %d, ProductID: %d, BrandName: %s, Quantity: %d, Price: %.2f",
 			item.ID, item.OrderID, item.ProductID, item.Product.BrandName, item.Quantity, item.Price)
 	}
-
 	log.Info().Msg("Success")
 
 	itemOrderedResponse := dto.ItemOrderedResponse{
@@ -209,6 +218,12 @@ func (s userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse, 
 		BrandName:  items[0].Product.BrandName,
 		TotalPrice: totalAmount,
 	}
+
+	err = s.userRepo.UpdateCartOrderStatus(args.UserID, itemOrderedResponse.OrderID, args.CartID)
+	if err != nil {
+		return nil, e.NewError(e.ErrCreateBook, "error while updating cart satus to not cative", err)
+	}
+	log.Info().Msg("Successfully updated the cart status to false after order being placed")
 
 	return &itemOrderedResponse, nil
 }
