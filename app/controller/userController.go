@@ -12,6 +12,7 @@ type UserController interface {
 	UpdateUserDetails(w http.ResponseWriter, r *http.Request)
 	AddItemsToCart(w http.ResponseWriter, r *http.Request)
 	PlaceOrder(w http.ResponseWriter, r *http.Request)
+	LoginUser(w http.ResponseWriter, r *http.Request)
 }
 
 type UserControllerImpl struct {
@@ -28,6 +29,16 @@ func (c *UserControllerImpl) UserDetails(w http.ResponseWriter, r *http.Request)
 	resp, err := c.userService.SaveUserDetails(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to create user")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *UserControllerImpl) LoginUser(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.userService.LoginUser(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to login user")
 		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
 		return
 	}

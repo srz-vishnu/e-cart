@@ -14,7 +14,7 @@ require (
 	gorm.io/gorm v1.25.12
 )
 
-require github.com/go-chi/chi v1.5.5
+require github.com/dgrijalva/jwt-go v3.2.0+incompatible
 
 require (
 	github.com/go-playground/locales v0.14.1 // indirect

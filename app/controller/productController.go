@@ -12,6 +12,8 @@ type ProductController interface {
 	ListAllProduct(w http.ResponseWriter, r *http.Request)
 	GetCatagoryById(w http.ResponseWriter, r *http.Request)
 	ListAllBrand(w http.ResponseWriter, r *http.Request)
+	UpdateCatagoryById(w http.ResponseWriter, r *http.Request)
+	UpdateBrandById(w http.ResponseWriter, r *http.Request)
 }
 
 type ProductControllerImpl struct {
@@ -54,7 +56,27 @@ func (c *ProductControllerImpl) GetCatagoryById(w http.ResponseWriter, r *http.R
 	api.Success(w, http.StatusOK, resp)
 }
 
-func (c ProductControllerImpl) ListAllBrand(w http.ResponseWriter, r *http.Request) {
+func (c *ProductControllerImpl) ListAllBrand(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.productService.ListAllBrands(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to get brand details")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *ProductControllerImpl) UpdateCatagoryById(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.productService.ListAllBrands(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to get brand details")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *ProductControllerImpl) UpdateBrandById(w http.ResponseWriter, r *http.Request) {
 	resp, err := c.productService.ListAllBrands(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to get brand details")

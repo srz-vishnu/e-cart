@@ -12,6 +12,8 @@ type ProductRepo interface {
 	GetAllProducts() ([]Category, error)
 	GetCategoryByID(categoryID int64) (*Category, error)
 	GetAllBrands() ([]Brand, error)
+	UpdateCategory(categoryID int64, newCategoryName string) error
+	UpdateBrand(brandID int64, newBrandName string, newPrice float64) error
 }
 
 type ProductRepoImpl struct {
@@ -163,4 +165,32 @@ func (r *ProductRepoImpl) GetAllBrands() ([]Brand, error) {
 		return nil, err
 	}
 	return brand, nil
+}
+
+// UpdateCategory updates the name of a category by its ID using GORM
+func (r *ProductRepoImpl) UpdateCategory(categoryID int64, newCategoryName string) error {
+	category := &Category{}
+	if err := r.db.First(category, categoryID).Error; err != nil {
+		return err
+	}
+
+	category.Categoryname = newCategoryName
+	if err := r.db.Save(category).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// UpdateBrand updates the name of a brand by its ID using GORM
+func (r *ProductRepoImpl) UpdateBrand(brandID int64, newBrandName string, newPrice float64) error {
+	brand := &Brand{}
+	if err := r.db.First(brand, brandID).Error; err != nil {
+		return err
+	}
+
+	brand.BrandName = newBrandName
+	if err := r.db.Save(brand).Error; err != nil {
+		return err
+	}
+	return nil
 }

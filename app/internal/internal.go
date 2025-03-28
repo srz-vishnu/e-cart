@@ -11,6 +11,7 @@ import (
 
 type UserRepo interface {
 	SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error)
+	GetUserByUsername(username string) (*Userdetail, error)
 	UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error
 	//	AddItemToCart(args *dto.AddItemToCart) error
 	IsUserActive(userID int64) (bool, error)
@@ -59,9 +60,11 @@ type Cart struct {
 	OrderStatus bool       `gorm:"column:orderstatus;not null;default:true"` // true if its active , once place cheytha false avanam
 	OrderDetail int64      `gorm:"column:orderdetail;"`                      // orderstatus false akumbol, orderid add cheyanam
 	User        Userdetail `gorm:"foreignKey:UserID;references:ID"`          // Relation to Userdetail table
-	Product     Brand      `gorm:"foreignKey:ProductID;references:ID"`       // Relation to Brand (Product) table (ProductID in the currenet table is a foreign key to the table brand, also a table le id anne ID)
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	BrandID     int64      `gorm:"column:id"`                                // Foreign key to Brand
+	Brand       Brand      `gorm:"foreignKey:ProductID"`                     // Assuming ProductID references Brand.ID
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type Order struct {
@@ -98,6 +101,14 @@ func (r *UserRepoImpl) SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, 
 		return 0, err
 	}
 	return user.ID, nil
+}
+
+func (r *UserRepoImpl) GetUserByUsername(username string) (*Userdetail, error) {
+	var user Userdetail
+	if err := r.db.Table("userdetails").Where("username = ?", username).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (r *UserRepoImpl) UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error {
@@ -230,8 +241,8 @@ func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity in
 func (r *UserRepoImpl) GetCartWithProductDetails(userID int64, productID int64) (*Cart, error) {
 	var cart Cart
 
-	// Use Preload to load the related product (Brand) details
-	if err := r.db.Preload("Product").Where("user_id = ? AND product_id = ?", userID, productID).First(&cart).Error; err != nil {
+	// Use Preload to load the related Brand (product) details
+	if err := r.db.Preload("Brand").Where("user_id = ? AND product_id = ?", userID, productID).First(&cart).Error; err != nil {
 		return nil, err
 	}
 
@@ -242,7 +253,11 @@ func (r *UserRepoImpl) GetCartWithProductDetails(userID int64, productID int64) 
 func (r *UserRepoImpl) FetchCartItems(userID, cartID int64) ([]Cart, error) {
 	var cartItems []Cart
 
-	if err := r.db.Table("carts").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
+	// if err := r.db.Table("carts").Preload("brands").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
+	// 	return nil, err
+	// }
+
+	if err := r.db.Preload("Brand").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
 		return nil, err
 	}
 
@@ -279,10 +294,10 @@ func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems 
 	for _, item := range cartItems {
 		orderItem := OrderItem{
 			OrderID:   newOrder.ID,
-			ProductID: item.ProductID,
+			ProductID: item.ProductID, // Just store the reference
 			Quantity:  item.Quantity,
 			Price:     item.Price,
-			Product:   Brand{BrandName: item.Product.BrandName},
+			// Remove the Product field - we don't need to store brand info here
 		}
 
 		// Save the OrderItem
@@ -293,6 +308,37 @@ func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems 
 
 	return newOrder, nil
 }
+
+// func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error) {
+// 	// Create a new Order
+// 	newOrder := &Order{
+// 		UserID: userID,
+// 		Total:  totalAmount,
+// 	}
+
+// 	// Create the order in the database
+// 	if err := r.db.Create(newOrder).Error; err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Create OrderItems for each cart item
+// 	for _, item := range cartItems {
+// 		orderItem := OrderItem{
+// 			OrderID:   newOrder.ID,
+// 			ProductID: item.ProductID,
+// 			Quantity:  item.Quantity,
+// 			Price:     item.Price,
+// 			Product:   Brand{BrandName: item.Brand.BrandName},
+// 		}
+
+// 		// Save the OrderItem
+// 		if err := r.db.Create(&orderItem).Error; err != nil {
+// 			return nil, err
+// 		}
+// 	}
+
+// 	return newOrder, nil
+// }
 
 // CreateOrderItems adds each cart item to the order.
 func (r *UserRepoImpl) CreateOrderItems(orderID int64, cartItems []Cart) ([]OrderItem, error) {
@@ -306,8 +352,8 @@ func (r *UserRepoImpl) CreateOrderItems(orderID int64, cartItems []Cart) ([]Orde
 			Quantity:  item.Quantity,
 			Price:     item.Price,
 			Product: Brand{
-				BrandName:  item.Product.BrandName,
-				CategoryID: item.Product.CategoryID,
+				BrandName:  item.Brand.BrandName,
+				CategoryID: item.Brand.CategoryID,
 			},
 		}
 

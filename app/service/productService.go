@@ -4,6 +4,7 @@ import (
 	"e-cart/app/dto"
 	"e-cart/app/internal"
 	"e-cart/pkg/e"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -149,4 +150,53 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 	}
 
 	return brandLists, nil
+}
+
+// UpdateCategory updates the category name
+func (s *ProductServiceImpl) UpdateCategory(r *http.Request) error {
+
+	args := &dto.UpdateCategory{}
+
+	err := args.Parse(r)
+	if err != nil {
+		return nil
+	}
+
+	//validation
+	err = args.Validate()
+	if err != nil {
+		return e.NewError(e.ErrValidateRequest, "error while validating", err)
+	}
+	log.Info().Msg("Successfully completed parsing and validation of request body")
+
+	if args.CategoryName == "" {
+		return errors.New("category name cannot be empty")
+	}
+	return s.productRepo.UpdateCategory(args.CategoryID, args.CategoryName)
+}
+
+// UpdateBrand updates the brand name
+func (s *ProductServiceImpl) UpdateBrand(r *http.Request) error {
+	args := &dto.UpdateBrand{}
+
+	err := args.Parse(r)
+	if err != nil {
+		return e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
+	}
+
+	//validation
+	err = args.Validate()
+	if err != nil {
+		return e.NewError(e.ErrValidateRequest, "error while validating", err)
+	}
+	log.Info().Msg("Successfully completed parsing and validation of request body")
+
+	if args.BrandName == "" {
+		return errors.New("brand name cannot be empty")
+	}
+	err = s.productRepo.UpdateBrand(args.BrandId, args.BrandName, args.Price)
+	if err != nil {
+		return e.NewError(e.ErrCreateBook, "no such id", err)
+	}
+	return nil
 }

@@ -35,6 +35,7 @@ func APIRouter(db *gorm.DB) chi.Router {
 	//user
 	r.Route("/user", func(r chi.Router) {
 		r.Post("/create", urController.UserDetails)
+		r.Post("/login", urController.LoginUser)
 		r.Put("/update/{userid}", urController.UpdateUserDetails)
 		r.Post("/cart/additem", urController.AddItemsToCart)
 		r.Post("/cart/placeorder", urController.PlaceOrder)
@@ -50,6 +51,10 @@ func APIRouter(db *gorm.DB) chi.Router {
 		r.Get("/list/brand", proController.ListAllBrand)
 		// to see product based on the catagory id given by user
 		r.Get("/search/catagory/{id}", proController.GetCatagoryById)
+
+		// r.Put("/list/catagory/{id}", proController.UpdateBrandById)
+		// r.Put("/list/brand/{id}", proController.UpdateBrand)
+
 	})
 
 	//admin
