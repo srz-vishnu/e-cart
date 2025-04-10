@@ -15,15 +15,17 @@ var (
 type Claims struct {
 	UserID   int64  `json:"id"` //here we including id and name here so that will be there on the token, so we can use it in the other layers
 	Username string `json:"username"`
+	IsAdmin  bool   `json:"isadmin"`
 	jwt.StandardClaims
 }
 
 // GenerateToken generates a new JWT token
-func GenerateToken(userID int64, username string) (string, error) {
+func GenerateToken(userID int64, username string, isadmin bool) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
 	claims := &Claims{
 		UserID:   userID,
 		Username: username,
+		IsAdmin:  isadmin,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(),
 		},

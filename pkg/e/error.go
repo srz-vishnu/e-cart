@@ -18,6 +18,14 @@ type HttpError struct {
 	Message    string
 }
 
+// use cheytha error nil issue can be solved
+// func (e *WrapError) Error() string {
+// 	if e.RootCause != nil {
+// 		return e.RootCause.Error()
+// 	}
+// 	return e.Msg // or return a default message
+// }
+
 func (e *WrapError) Error() string {
 	return e.RootCause.Error()
 }

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"e-cart/app/dto"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,6 +12,7 @@ type ProductRepo interface {
 	CreateAndUpsertProductDetail(args *dto.CreateCategoryDetailRequest) (int64, error)
 	GetAllProducts() ([]Category, error)
 	GetCategoryByID(categoryID int64) (*Category, error)
+	GetCategoryByName(categoryName string) (*Category, error)
 	GetAllBrands() ([]Brand, error)
 	UpdateCategory(categoryID int64, newCategoryName string) error
 	UpdateBrand(brandID int64, newBrandName string, newPrice float64) error
@@ -42,6 +44,7 @@ type Category struct {
 type Brand struct {
 	ID          int64      `gorm:"primaryKey"`
 	CategoryID  int64      `gorm:"column:category_id;not null"` // Foreign key to Category
+	Category    Category   `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
 	BrandName   string     `gorm:"column:brandname;not null"`
 	Price       float64    `gorm:"column:price;not null"`
 	StockCount  int64      `gorm:"column:stockcount;not null"`
@@ -53,40 +56,10 @@ type Brand struct {
 }
 
 // To add new product in to the list
-// func (r *ProductRepoImpl) CreateNewProductDetail(args *dto.CreateCategoryDetailRequest) (int64, error) {
-// 	// Create the product first
-// 	catagory := Category{
-// 		ID:           args.CategoryID,
-// 		Categoryname: args.CategoryName,
-// 		Description:  args.Description,
-// 	}
-
-// 	// Insert the product into the productdetails table
-// 	if err := r.db.Table("categories").Create(&catagory).Error; err != nil {
-// 		return 0, err
-// 	}
-
-// 	// Create categories for this product
-// 	for _, cat := range args.Brands {
-// 		brand := Brand{
-// 			CategoryID: catagory.ID,
-// 			BrandName:  cat.BrandName,
-// 			Price:      cat.Price,
-// 			StockCount: cat.StockCount,
-// 		}
-// 		// Insert category for this product into the categories table
-// 		if err := r.db.Table("brands").Create(&brand).Error; err != nil {
-// 			return 0, err
-// 		}
-// 	}
-
-// 	return catagory.ID, nil
-// }
-
 func (r *ProductRepoImpl) CreateAndUpsertProductDetail(args *dto.CreateCategoryDetailRequest) (int64, error) {
 	var category Category
 
-	// Check if the category exists by CategoryName
+	// First check if category exists by name
 	if err := r.db.Table("categories").Where("categoryname = ?", args.CategoryName).First(&category).Error; err != nil {
 		// If category not found, create a new category
 		if err == gorm.ErrRecordNotFound {
@@ -101,6 +74,12 @@ func (r *ProductRepoImpl) CreateAndUpsertProductDetail(args *dto.CreateCategoryD
 			}
 		} else {
 			return 0, err
+		}
+	} else {
+		// Category exists - verify the ID matches
+		if category.ID != args.CategoryID {
+			return 0, fmt.Errorf("category name '%s' already exists with ID %d, but request provided ID %d",
+				args.CategoryName, category.ID, args.CategoryID)
 		}
 	}
 
@@ -152,8 +131,15 @@ func (r *ProductRepoImpl) GetAllProducts() ([]Category, error) {
 
 func (r *ProductRepoImpl) GetCategoryByID(categoryID int64) (*Category, error) {
 	var category Category
-	// preload nokanam
 	if err := r.db.Preload("Brands").First(&category, categoryID).Error; err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
+func (r *ProductRepoImpl) GetCategoryByName(categoryName string) (*Category, error) {
+	var category Category
+	if err := r.db.Preload("Brands").Where("categoryname = ?", categoryName).First(&category).Error; err != nil {
 		return nil, err
 	}
 	return &category, nil
@@ -161,9 +147,11 @@ func (r *ProductRepoImpl) GetCategoryByID(categoryID int64) (*Category, error) {
 
 func (r *ProductRepoImpl) GetAllBrands() ([]Brand, error) {
 	var brand []Brand
-	if err := r.db.Find(&brand).Error; err != nil {
+
+	if err := r.db.Preload("Category").Find(&brand).Error; err != nil {
 		return nil, err
 	}
+
 	return brand, nil
 }
 

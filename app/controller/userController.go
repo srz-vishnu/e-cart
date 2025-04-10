@@ -8,11 +8,14 @@ import (
 )
 
 type UserController interface {
+	LoginUser(w http.ResponseWriter, r *http.Request)
 	UserDetails(w http.ResponseWriter, r *http.Request)
 	UpdateUserDetails(w http.ResponseWriter, r *http.Request)
+	ViewUserCart(w http.ResponseWriter, r *http.Request)
+	ClearCart(w http.ResponseWriter, r *http.Request)
 	AddItemsToCart(w http.ResponseWriter, r *http.Request)
 	PlaceOrder(w http.ResponseWriter, r *http.Request)
-	LoginUser(w http.ResponseWriter, r *http.Request)
+	OrderHistory(w http.ResponseWriter, r *http.Request)
 }
 
 type UserControllerImpl struct {
@@ -70,6 +73,36 @@ func (c *UserControllerImpl) PlaceOrder(w http.ResponseWriter, r *http.Request) 
 	resp, err := c.userService.PlaceOrder(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to place the order")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *UserControllerImpl) ViewUserCart(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.userService.ViewUserCart(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to view the cart")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *UserControllerImpl) ClearCart(w http.ResponseWriter, r *http.Request) {
+	err := c.userService.ClearCart(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to clear the cart")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, "success")
+}
+
+func (c *UserControllerImpl) OrderHistory(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.userService.OrderHistory(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to get the order history")
 		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
 		return
 	}

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"e-cart/app/dto"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -13,17 +14,18 @@ type UserRepo interface {
 	SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error)
 	GetUserByUsername(username string) (*Userdetail, error)
 	UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error
-	//	AddItemToCart(args *dto.AddItemToCart) error
 	IsUserActive(userID int64) (bool, error)
-	GetProductDetails(productID, categoryID, quantity int64) (*Brand, error)
+	GetProductDetails(productID, categoryID int64) (*Brand, error)
 	CheckProductInCart(userID, productID int64) (*Cart, error)
 	FetchCartItems(userID, cartID int64) ([]Cart, error)
-	//CartWithProductDetails(UserID, ProductID int64) (*Cart, error)
-	AddOrUpdateCart(userID int64, product *Brand, quantity int64) error
+	AddOrUpdateCart(userID int64, product *Brand, quantity int64, totalAmount float64) error
 	GetCartWithProductDetails(userID int64, productID int64) (*Cart, error)
-	CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error)
-	CreateOrderItems(orderID int64, cartItems []Cart) ([]OrderItem, error)
 	UpdateCartOrderStatus(userID, orderID, cartID int64) error
+	UpdateStockCount(orderItems []OrderItem) ([]Brand, error)
+	ViewCart(userID int64) ([]Cart, error)
+	ClearCart(userID int64) error
+	CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, []OrderItem, error)
+	GetUserByID(userID int64) (*Userdetail, error)
 }
 
 type UserRepoImpl struct {
@@ -46,27 +48,22 @@ type Userdetail struct {
 	Mail        string    `gorm:"column:mail;not null"`
 	Status      bool      `gorm:"column:status;default:true;not null"` // Boolean field, default true
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
-	// IsDeleted   bool       `gorm:"column:is_deleted;default:false"`
-	// DeletedAt   *time.Time `gorm:"column:deleted_at"`
-	// DeletedBy   *int64     `gorm:"column:deleted_by"`
+	IsAdmin     bool      `gorm:"column:isadmin;default:false;not null"` // default false for user, true is used when  admin logins
 }
 
 type Cart struct {
-	ID          int64      `gorm:"primaryKey"`
-	UserID      int64      `gorm:"column:user_id;not null"`    // Foreign key to User
-	ProductID   int64      `gorm:"column:product_id;not null"` // Foreign key to Brand
-	Quantity    int64      `gorm:"column:quantity;not null;default:1"`
-	Price       float64    `gorm:"column:price;not null"`
-	OrderStatus bool       `gorm:"column:orderstatus;not null;default:true"` // true if its active , once place cheytha false avanam
-	OrderDetail int64      `gorm:"column:orderdetail;"`                      // orderstatus false akumbol, orderid add cheyanam
-	User        Userdetail `gorm:"foreignKey:UserID;references:ID"`          // Relation to Userdetail table
-	BrandID     int64      `gorm:"column:id"`                                // Foreign key to Brand
-	Brand       Brand      `gorm:"foreignKey:ProductID"`                     // Assuming ProductID references Brand.ID
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          int64   `gorm:"primaryKey"`
+	UserID      int64   `gorm:"column:user_id;not null"`
+	ProductID   int64   `gorm:"column:product_id;not null"` // Foreign key to Brand.ID
+	Quantity    int64   `gorm:"column:quantity;not null;default:1"`
+	Price       float64 `gorm:"column:price;not null"`
+	TotalAmount float64 `gorm:"column:totalamount;not null; default:0"`
+	OrderStatus bool    `gorm:"column:orderstatus;not null;default:true"`
+	OrderDetail int64   `gorm:"column:orderdetail;"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	Brand       Brand `gorm:"foreignKey:ProductID"` // Relationship to Brand
 }
-
 type Order struct {
 	ID        int64       `gorm:"primaryKey"`
 	UserID    int64       `gorm:"index;not null"` // Foreign key to Userdetail
@@ -74,27 +71,32 @@ type Order struct {
 	CreatedAt time.Time   `gorm:"autoCreateTime"`
 	User      Userdetail  `gorm:"foreignKey:UserID;references:ID"` // Relation to Userdetail table
 	Items     []OrderItem `gorm:"foreignKey:OrderID"`              // One-to-many relation with OrderItem
+	UpdatedAt time.Time   `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 type OrderItem struct {
-	ID        int64   `gorm:"primaryKey"`
-	OrderID   int64   `gorm:"index;not null"` // Foreign key to Order
-	ProductID int64   `gorm:"not null"`       // Foreign key to Product (Brand)
-	Quantity  int64   `gorm:"not null"`
-	Price     float64 `gorm:"not null"`
-	Order     Order   `gorm:"foreignKey:OrderID;references:ID"`   // Relation to Order
-	Product   Brand   `gorm:"foreignKey:ProductID;references:ID"` // Relation to Brand, orderid is foreign key to order table, a table le primary id anne ivide reference id ayite irikane
+	ID        int64     `gorm:"primaryKey"`
+	OrderID   int64     `gorm:"index;not null"` // Foreign key to Order
+	ProductID int64     `gorm:"not null"`       // Foreign key to Product (Brand)
+	Quantity  int64     `gorm:"not null"`
+	Price     float64   `gorm:"not null"`
+	Order     Order     `gorm:"foreignKey:OrderID;references:ID"`   // Relation to Order
+	Product   Brand     `gorm:"foreignKey:ProductID;references:ID"` // Relation to Brand, orderid is foreign key to order table, a table le primary id anne ivide reference id ayite irikane
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 func (r *UserRepoImpl) SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error) {
 
 	user := Userdetail{
-		ID:       args.UserID,
-		Address:  args.Address,
-		Mail:     args.Mail,
-		Username: args.UserName,
-		Password: args.Password,
-		Pincode:  args.Pincode,
+		ID:          args.UserID,
+		Address:     args.Address,
+		Mail:        args.Mail,
+		Username:    args.UserName,
+		Password:    args.Password,
+		Pincode:     args.Pincode,
+		Phonenumber: args.Phone,
+		IsAdmin:     args.IsAdmin,
 	}
 	//GORM's Create method to insert the new user
 	if err := r.db.Table("userdetails").Create(&user).Error; err != nil {
@@ -137,22 +139,6 @@ func (r *UserRepoImpl) UpdateUserDetails(args *dto.UpdateUserDetailRequest, User
 	return nil
 }
 
-// func (r *UserRepoImpl) AddItemToCart(args *dto.AddItemToCart) error {
-
-// 	item := Cart{
-// 		UserID:    args.UserID,
-// 		ProductID: args.ProductID,
-// 		Quantity:  args.Quantity,
-// 		//Price:     args.Price,
-// 	}
-
-// 	if err := r.db.Table("carts").Create(&item).Error; err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }
-
 func (r *UserRepoImpl) IsUserActive(userID int64) (bool, error) {
 	var user Userdetail
 
@@ -167,7 +153,7 @@ func (r *UserRepoImpl) IsUserActive(userID int64) (bool, error) {
 	return user.Status, nil
 }
 
-func (r *UserRepoImpl) GetProductDetails(brandID, categoryID, quantity int64) (*Brand, error) {
+func (r *UserRepoImpl) GetProductDetails(brandID, categoryID int64) (*Brand, error) {
 	var product Brand
 
 	if err := r.db.Table("brands").Where("id = ? AND category_id = ? ", categoryID, brandID).First(&product).Error; err != nil {
@@ -176,11 +162,6 @@ func (r *UserRepoImpl) GetProductDetails(brandID, categoryID, quantity int64) (*
 			return nil, fmt.Errorf("product with id %d not found", brandID)
 		}
 		return nil, err
-	}
-
-	// Check if the requested quantity is available in total stock
-	if quantity > product.StockCount {
-		return nil, fmt.Errorf("requested quantity %d exceeds available stock %d for product ID %d with Brand ID %d", quantity, product.StockCount, categoryID, brandID)
 	}
 
 	return &product, nil
@@ -201,7 +182,7 @@ func (r *UserRepoImpl) CheckProductInCart(userID, productID int64) (*Cart, error
 	return &cart, nil
 }
 
-func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity int64) error {
+func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity int64, totalAmount float64) error {
 	var existingCart Cart
 
 	// Check if the product already exists in the user's cart
@@ -209,14 +190,12 @@ func (r *UserRepoImpl) AddOrUpdateCart(userID int64, product *Brand, quantity in
 		if err == gorm.ErrRecordNotFound {
 			// If cart item does not exist, create a new cart item
 			newCart := Cart{
-				UserID:    userID,
-				ProductID: product.ID,
-				Quantity:  quantity,
-				Price:     product.Price,
-				// Product: Brand{
-				// 	CategoryID: product.CategoryID,
-				// 	BrandName:  product.BrandName,
-				// },
+				UserID:      userID,
+				ProductID:   product.ID,
+				Quantity:    quantity,
+				Price:       product.Price,
+				TotalAmount: totalAmount,
+				//Brand:     Brand,
 			}
 			if err := r.db.Table("carts").Create(&newCart).Error; err != nil {
 				return err
@@ -253,10 +232,6 @@ func (r *UserRepoImpl) GetCartWithProductDetails(userID int64, productID int64) 
 func (r *UserRepoImpl) FetchCartItems(userID, cartID int64) ([]Cart, error) {
 	var cartItems []Cart
 
-	// if err := r.db.Table("carts").Preload("brands").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
-	// 	return nil, err
-	// }
-
 	if err := r.db.Preload("Brand").Where("user_id = ? AND id = ?", userID, cartID).Find(&cartItems).Error; err != nil {
 		return nil, err
 	}
@@ -266,112 +241,6 @@ func (r *UserRepoImpl) FetchCartItems(userID, cartID int64) ([]Cart, error) {
 	}
 
 	return cartItems, nil
-}
-
-// func (r *UserRepoImpl) CartWithProductDetails(UserID, ProductID int64) (*Cart, error) {
-// 	var cart Cart
-
-// 	// Use Preload to load the related product (Brand) details
-// 	if err := r.db.Preload("Product").Where("user_id = ? AND product_id = ?", UserID, ProductID).First(&cart).Error; err != nil {
-// 		return nil, err
-// 	}
-// 	return &cart, nil
-// }
-
-func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error) {
-	// Create a new Order
-	newOrder := &Order{
-		UserID: userID,
-		Total:  totalAmount,
-	}
-
-	// Create the order in the database
-	if err := r.db.Create(newOrder).Error; err != nil {
-		return nil, err
-	}
-
-	// Create OrderItems for each cart item
-	for _, item := range cartItems {
-		orderItem := OrderItem{
-			OrderID:   newOrder.ID,
-			ProductID: item.ProductID, // Just store the reference
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-			// Remove the Product field - we don't need to store brand info here
-		}
-
-		// Save the OrderItem
-		if err := r.db.Create(&orderItem).Error; err != nil {
-			return nil, err
-		}
-	}
-
-	return newOrder, nil
-}
-
-// func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, error) {
-// 	// Create a new Order
-// 	newOrder := &Order{
-// 		UserID: userID,
-// 		Total:  totalAmount,
-// 	}
-
-// 	// Create the order in the database
-// 	if err := r.db.Create(newOrder).Error; err != nil {
-// 		return nil, err
-// 	}
-
-// 	// Create OrderItems for each cart item
-// 	for _, item := range cartItems {
-// 		orderItem := OrderItem{
-// 			OrderID:   newOrder.ID,
-// 			ProductID: item.ProductID,
-// 			Quantity:  item.Quantity,
-// 			Price:     item.Price,
-// 			Product:   Brand{BrandName: item.Brand.BrandName},
-// 		}
-
-// 		// Save the OrderItem
-// 		if err := r.db.Create(&orderItem).Error; err != nil {
-// 			return nil, err
-// 		}
-// 	}
-
-// 	return newOrder, nil
-// }
-
-// CreateOrderItems adds each cart item to the order.
-func (r *UserRepoImpl) CreateOrderItems(orderID int64, cartItems []Cart) ([]OrderItem, error) {
-
-	var createdItems []OrderItem
-
-	for _, item := range cartItems {
-		orderItem := OrderItem{
-			OrderID:   orderID,
-			ProductID: item.ProductID,
-			Quantity:  item.Quantity,
-			Price:     item.Price,
-			Product: Brand{
-				BrandName:  item.Brand.BrandName,
-				CategoryID: item.Brand.CategoryID,
-			},
-		}
-
-		if err := r.db.Table("order_items").Create(&orderItem).Error; err != nil {
-			return nil, err
-		}
-		createdItems = append(createdItems, orderItem)
-	}
-
-	return createdItems, nil
-}
-
-// ClearCart deletes all items from the cart for the given user.
-func (r *UserRepoImpl) ClearCart(userID int64) error {
-	if err := r.db.Table("carts").Where("user_id = ?", userID).Delete(&Cart{}).Error; err != nil {
-		return err
-	}
-	return nil
 }
 
 // UpdateCartOrder updates the order status to false and adds the order ID to orderdetail
@@ -396,4 +265,170 @@ func (r *UserRepoImpl) UpdateCartOrderStatus(userID, orderID, cartID int64) erro
 	}
 
 	return nil
+}
+
+func (r *UserRepoImpl) UpdateStockCount(orderItems []OrderItem) ([]Brand, error) {
+	var updatedBrands []Brand
+	var productIDs []int64
+
+	// Collect all product IDs first
+	for _, item := range orderItems {
+		productIDs = append(productIDs, item.ProductID)
+	}
+
+	// Preload all brands in a single query
+	var brands []Brand
+	if err := r.db.Where("id IN ?", productIDs).Find(&brands).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch product details: %w", err)
+	}
+
+	// Create a map for quick lookup
+	brandMap := make(map[int64]Brand)
+	for _, brand := range brands {
+		brandMap[brand.ID] = brand
+	}
+
+	// Update stock counts
+	for _, item := range orderItems {
+		brand, exists := brandMap[item.ProductID]
+		if !exists {
+			return nil, fmt.Errorf("product ID %d not found", item.ProductID)
+		}
+
+		if brand.StockCount < item.Quantity {
+			return nil, fmt.Errorf("insufficient stock for product ID %d (current: %d, required: %d)",
+				item.ProductID, brand.StockCount, item.Quantity)
+		}
+
+		brand.StockCount -= item.Quantity
+		if err := r.db.Save(&brand).Error; err != nil {
+			return nil, fmt.Errorf("failed to update stock for product ID %d: %w", item.ProductID, err)
+		}
+
+		updatedBrands = append(updatedBrands, brand)
+	}
+
+	return updatedBrands, nil
+}
+
+// ClearCart deletes all items from the cart for the given user.
+func (r *UserRepoImpl) ViewCart(userID int64) ([]Cart, error) {
+	var cartItems []Cart
+	if err := r.db.Preload("Brand").Where("user_id = ? AND orderstatus = ?", userID, true).Find(&cartItems).Error; err != nil {
+		return nil, err
+	}
+	return cartItems, nil
+}
+
+func (r *UserRepoImpl) ClearCart(userID int64) error {
+	var cartItems Cart
+
+	result := r.db.Preload("Brand").Where("user_id = ? AND orderstatus = ?", userID, true).Delete(&cartItems)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("no cart items found for this user")
+	}
+	return nil
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, []OrderItem, error) {
+// 	// Create the order
+// 	newOrder := &Order{
+// 		UserID: userID,
+// 		Total:  totalAmount,
+// 	}
+
+// 	if err := r.db.Create(newOrder).Error; err != nil {
+// 		return nil, nil, err
+// 	}
+
+// 	// Create order items
+// 	var createdItems []OrderItem
+// 	for _, item := range cartItems {
+// 		// Get complete brand details
+// 		var brand Brand
+// 		if err := r.db.Where("id = ?", item.ProductID).First(&brand).Error; err != nil {
+// 			return nil, nil, fmt.Errorf("failed to get brand details for product ID %d: %w", item.ProductID, err)
+// 		}
+
+// 		orderItem := OrderItem{
+// 			OrderID:   newOrder.ID,
+// 			ProductID: item.ProductID,
+// 			Quantity:  item.Quantity,
+// 			Price:     item.Price,
+// 			Product:   brand,
+// 		}
+
+// 		if err := r.db.Create(&orderItem).Error; err != nil {
+// 			return nil, nil, err
+// 		}
+
+// 		createdItems = append(createdItems, orderItem)
+// 	}
+
+// 	return newOrder, createdItems, nil
+// }
+
+func (r *UserRepoImpl) GetUserByID(userID int64) (*Userdetail, error) {
+	var user Userdetail
+	if err := r.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, []OrderItem, error) {
+	tx := r.db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Create the order (using tx)
+	newOrder := &Order{
+		UserID: userID,
+		Total:  totalAmount,
+	}
+
+	if err := tx.Create(newOrder).Error; err != nil {
+		tx.Rollback()
+		return nil, nil, err
+	}
+
+	// Create order items (using tx)
+	var createdItems []OrderItem
+	for _, item := range cartItems {
+		// Get brand details (using tx)
+		var brand Brand
+		if err := tx.Where("id = ?", item.ProductID).First(&brand).Error; err != nil {
+			tx.Rollback()
+			return nil, nil, fmt.Errorf("failed to get brand details: %w", err)
+		}
+
+		orderItem := OrderItem{
+			OrderID:   newOrder.ID,
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+			Price:     item.Price,
+			Product:   brand,
+		}
+
+		if err := tx.Create(&orderItem).Error; err != nil {
+			tx.Rollback()
+			return nil, nil, err
+		}
+
+		createdItems = append(createdItems, orderItem)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return nil, nil, err
+	}
+
+	return newOrder, createdItems, nil
 }

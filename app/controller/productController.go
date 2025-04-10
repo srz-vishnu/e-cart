@@ -11,6 +11,7 @@ type ProductController interface {
 	CreateProduct(w http.ResponseWriter, r *http.Request)
 	ListAllProduct(w http.ResponseWriter, r *http.Request)
 	GetCatagoryById(w http.ResponseWriter, r *http.Request)
+	GetCatagoryByName(w http.ResponseWriter, r *http.Request)
 	ListAllBrand(w http.ResponseWriter, r *http.Request)
 	UpdateCatagoryById(w http.ResponseWriter, r *http.Request)
 	UpdateBrandById(w http.ResponseWriter, r *http.Request)
@@ -50,6 +51,16 @@ func (c *ProductControllerImpl) GetCatagoryById(w http.ResponseWriter, r *http.R
 	resp, err := c.productService.GetCatagoryById(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to get item by catagory ID")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *ProductControllerImpl) GetCatagoryByName(w http.ResponseWriter, r *http.Request) {
+	resp, err := c.productService.GetCatagoryByName(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to get item by category Name")
 		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
 		return
 	}

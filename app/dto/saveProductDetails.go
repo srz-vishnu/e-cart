@@ -3,17 +3,10 @@ package dto
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-playground/validator"
 )
-
-// type CreateProductDetailRequest struct {
-// 	ProductID    int64   `json:"productid"`
-// 	ProductName  string  `json:"productname" validate:"required"`
-// 	Description  string  `json:"description"`
-// 	ProductPrice float64 `json:"productprice" validae:"required"`
-// 	StockCount   int64   `json:"stockcount" validate:"required"`
-// }
 
 type CreateCategoryDetailRequest struct {
 	CategoryID   int64                `json:"categoryid"`
@@ -38,6 +31,10 @@ func (args *CreateCategoryDetailRequest) Parse(r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	// here we convert the incoming Category_name to Upper case format
+	args.CategoryName = strings.ToUpper(args.CategoryName)
+
 	return nil
 }
 

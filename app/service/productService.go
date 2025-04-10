@@ -14,7 +14,8 @@ import (
 type ProductService interface {
 	CreateProduct(r *http.Request) (*dto.CreateProductResponds, error)
 	ListAllProduct(r *http.Request) ([]*dto.CatagoryListResponse, error)
-	GetCatagoryById(r *http.Request) (*dto.CreateCategoryDetailRequest, error)
+	GetCatagoryById(r *http.Request) (*dto.CategoryDetailResponse, error)
+	GetCatagoryByName(r *http.Request) (*dto.CategoryDetailResponse, error)
 	ListAllBrands(r *http.Request) ([]*dto.BrandDetailResponse, error)
 }
 
@@ -85,7 +86,7 @@ func (s *ProductServiceImpl) ListAllProduct(r *http.Request) ([]*dto.CatagoryLis
 	return catagorylists, nil
 }
 
-func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CreateCategoryDetailRequest, error) {
+func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CategoryDetailResponse, error) {
 	args := &dto.SearchByCatagoryIdRequest{}
 
 	//parsing
@@ -95,14 +96,13 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CreateCatego
 		return nil, e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
 	}
 
-	fmt.Printf("print something  %d", args.CatagoryId)
 	cat, err := s.productRepo.GetCategoryByID(args.CatagoryId)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateBook, "error while catagory detials", err)
 	}
 
 	// Map the category and brand data to the DTO
-	var response dto.CreateCategoryDetailRequest
+	var response dto.CategoryDetailResponse
 
 	response.CategoryID = cat.ID
 	response.CategoryName = cat.Categoryname
@@ -122,6 +122,39 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CreateCatego
 
 }
 
+func (s *ProductServiceImpl) GetCatagoryByName(r *http.Request) (*dto.CategoryDetailResponse, error) {
+
+	args := &dto.SearchProductByNameRequest{}
+
+	err := args.Parse(r)
+	if err != nil {
+		log.Printf("Error parsing category name: %v\n", err)
+		return nil, e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
+	}
+
+	categoryDetails, err := s.productRepo.GetCategoryByName(args.CategoryName)
+	if err != nil {
+		return nil, e.NewError(e.ErrCreateBook, "error while getting category details by name", err)
+	}
+
+	var response dto.CategoryDetailResponse
+
+	response.CategoryID = categoryDetails.ID
+	response.CategoryName = categoryDetails.Categoryname
+	response.Description = categoryDetails.Description
+
+	for _, brand := range categoryDetails.Brands {
+		brandResp := dto.BrandDetailRequest{
+			BrandName:  brand.BrandName,
+			Price:      brand.Price,
+			StockCount: brand.StockCount,
+		}
+		response.Brands = append(response.Brands, brandResp)
+	}
+
+	return &response, nil
+}
+
 func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailResponse, error) {
 
 	allBrandList, err := s.productRepo.GetAllBrands()
@@ -134,11 +167,12 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 
 	for _, catBrand := range allBrandList {
 		brandList := dto.BrandDetailResponse{
-			BrandName:  catBrand.BrandName,
-			BrandId:    catBrand.ID,
-			Price:      catBrand.Price,
-			StockCount: catBrand.StockCount,
-			CategoryID: catBrand.CategoryID,
+			BrandName:    catBrand.BrandName,
+			BrandId:      catBrand.ID,
+			Price:        catBrand.Price,
+			StockCount:   catBrand.StockCount,
+			CategoryID:   catBrand.CategoryID,
+			CategoryName: catBrand.Category.Categoryname,
 		}
 		brandLists = append(brandLists, &brandList)
 		fmt.Printf("brand items %v", brandLists)

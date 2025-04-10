@@ -2,7 +2,6 @@ package dto
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -15,7 +14,6 @@ type SearchByCatagoryIdRequest struct {
 
 func (args *SearchByCatagoryIdRequest) Parse(r *http.Request) error {
 	strID := chi.URLParam(r, "id")
-	log.Printf("Extracted ID from URL issssssssssssssssss: '%s'\n", strID)
 	if strID == "" {
 		return fmt.Errorf("id parameter is missing or empty")
 	}

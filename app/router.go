@@ -5,6 +5,7 @@ import (
 	"e-cart/app/internal"
 	"e-cart/app/service"
 	api "e-cart/pkg/api"
+	"e-cart/pkg/middleware"
 
 	"github.com/go-chi/chi/v5"
 	"gorm.io/gorm"
@@ -30,37 +31,41 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 	r.Route("/", func(r chi.Router) {
 		r.Get("/hello", api.ExampleHamdler)
+		r.Post("/signup", urController.UserDetails)
+		r.Post("/login", urController.LoginUser)
 	})
 
-	//user
+	// User routes — JWT middleware applied
 	r.Route("/user", func(r chi.Router) {
-		r.Post("/create", urController.UserDetails)
-		r.Post("/login", urController.LoginUser)
+		r.Use(middleware.JWTAuthMiddleware) // All user routes require login
 		r.Put("/update/{userid}", urController.UpdateUserDetails)
 		r.Post("/cart/additem", urController.AddItemsToCart)
+		r.Get("/cart/view", urController.ViewUserCart)
+		r.Delete("/cart/clear", urController.ClearCart)
 		r.Post("/cart/placeorder", urController.PlaceOrder)
+		r.Get("/order/history", urController.OrderHistory)
 	})
 
-	//product
+	// Product routes — JWT middleware applied
 	r.Route("/product", func(r chi.Router) {
-		// create used to create a product
-		r.Post("/create", proController.CreateProduct)
-		// to view product
+		r.Use(middleware.JWTAuthMiddleware) //  All product routes need login
+
 		r.Get("/list/catagory", proController.ListAllProduct)
-		// to view brand
 		r.Get("/list/brand", proController.ListAllBrand)
-		// to see product based on the catagory id given by user
 		r.Get("/search/catagory/{id}", proController.GetCatagoryById)
+		r.Get("/search/catagory/{categoryname}", proController.GetCatagoryByName)
 
-		// r.Put("/list/catagory/{id}", proController.UpdateBrandById)
-		// r.Put("/list/brand/{id}", proController.UpdateBrand)
-
+		// Create product — admin only
+		r.With(middleware.AdminOnlyMiddleware).Post("/create", proController.CreateProduct)
 	})
 
-	//admin
+	// Admin routes — JWT and Admin middleware
 	r.Route("/admin", func(r chi.Router) {
-		r.Put("/block/{useridid}", adminController.BlockUser)
-		r.Put("/unblock/{useridid}", adminController.BlockUser)
+		r.Use(middleware.JWTAuthMiddleware)   //  Require login
+		r.Use(middleware.AdminOnlyMiddleware) //  Must be admin
+
+		r.Put("/block/{userid}", adminController.BlockUser)     // admin only
+		r.Put("/unblock/{userid}", adminController.UnBlockUser) // admin only
 	})
 
 	return r
