@@ -16,6 +16,8 @@ type UserController interface {
 	AddItemsToCart(w http.ResponseWriter, r *http.Request)
 	PlaceOrder(w http.ResponseWriter, r *http.Request)
 	OrderHistory(w http.ResponseWriter, r *http.Request)
+	AddItemsToFavourites(w http.ResponseWriter, r *http.Request)
+	GetUserFavouriteItems(w http.ResponseWriter, r *http.Request)
 }
 
 type UserControllerImpl struct {
@@ -107,4 +109,25 @@ func (c *UserControllerImpl) OrderHistory(w http.ResponseWriter, r *http.Request
 		return
 	}
 	api.Success(w, http.StatusOK, resp)
+}
+
+func (c *UserControllerImpl) AddItemsToFavourites(w http.ResponseWriter, r *http.Request) {
+	err := c.userService.AddItemsToFavourites(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to update brand in to favourites")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, "success")
+}
+
+func (c *UserControllerImpl) GetUserFavouriteItems(w http.ResponseWriter, r *http.Request) {
+	brands, err := c.userService.GetUserFavouriteBrands(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to fetch favourite brands of user")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+
+	api.Success(w, http.StatusOK, brands)
 }

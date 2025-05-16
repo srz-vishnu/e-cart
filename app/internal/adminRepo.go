@@ -11,6 +11,8 @@ type AdminRepo interface {
 	BlockUser(userId int64) error
 	UnBlockUser(userId int64) error
 	GetAllUsers() ([]Userdetail, error)
+	GetAllBlockedUsers() ([]Userdetail, error)
+	GetAllOrders() ([]Order, error)
 }
 
 type AdminRepoImpl struct {
@@ -46,12 +48,12 @@ func (r *AdminRepoImpl) BlockUser(userId int64) error {
 }
 
 func (r *AdminRepoImpl) UnBlockUser(userId int64) error {
-
+	var user Userdetail
 	updates := map[string]interface{}{
 		"status":     true,
 		"updated_at": time.Now(),
 	}
-	result := r.db.Model("userdetails").Where("id = ?", userId).Updates(updates)
+	result := r.db.Model(&user).Where("id = ?", userId).Updates(updates)
 
 	if result.Error != nil {
 		return result.Error
@@ -68,11 +70,40 @@ func (r *AdminRepoImpl) GetAllUsers() ([]Userdetail, error) {
 
 	var details []Userdetail
 
-	result := r.db.Where("status = ?", true).Find(&details)
+	result := r.db.Model(&details).
+		Where("status = ? AND isadmin = ?", true, false).
+		Find(&details)
 
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
 	return details, nil
+}
+
+func (r *AdminRepoImpl) GetAllBlockedUsers() ([]Userdetail, error) {
+
+	var blockedUserDetails []Userdetail
+
+	result := r.db.Model(&blockedUserDetails).
+		Where("status = ? AND isadmin = ?", false, false).
+		Find(&blockedUserDetails)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	return blockedUserDetails, nil
+}
+
+func (r *AdminRepoImpl) GetAllOrders() ([]Order, error) {
+	var orders []Order
+
+	err := r.db.Preload("Items").Preload("Items.Product").Preload("User").Order("created_at DESC").Find(&orders).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
 }

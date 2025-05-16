@@ -19,10 +19,25 @@ type BrandDetailRequest struct {
 	BrandName  string  `json:"brandname" validate:"required"`
 	Price      float64 `json:"price" validate:"required"`
 	StockCount int64   `json:"stockcount" validate:"required"`
+	ImageLink  string  `json:"imagelink" validate:"required"`
 }
 
+// type CreateProductResponds struct {
+// 	ProductID int64 `json:"productid"`
+// }
+
 type CreateProductResponds struct {
-	ProductID int64 `json:"productid"`
+	ProductID   int64           `json:"product_id"`
+	Category    string          `json:"category_name"`
+	Description string          `json:"description"`
+	Brands      []BrandResponse `json:"brands"`
+}
+
+type BrandResponse struct {
+	BrandName  string  `json:"brand_name"`
+	Price      float64 `json:"price"`
+	StockCount int64   `json:"stock_count"`
+	ImageLink  string  `json:"imagelink" validate:"required"`
 }
 
 func (args *CreateCategoryDetailRequest) Parse(r *http.Request) error {

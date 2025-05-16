@@ -26,6 +26,10 @@ type UserRepo interface {
 	ClearCart(userID int64) error
 	CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, []OrderItem, error)
 	GetUserByID(userID int64) (*Userdetail, error)
+	GetOrderHistoryByUserID(userID int64) ([]Order, error)
+	AddOrUpdateFavorite(userID int64, args dto.UserFavoriteBrandRequest) error
+	GetFavoriteBrandIDs(userID int64) ([]int64, error)
+	GetBrandsByIDs(brandIDs []int64) ([]Brand, error)
 }
 
 type UserRepoImpl struct {
@@ -49,6 +53,10 @@ type Userdetail struct {
 	Status      bool      `gorm:"column:status;default:true;not null"` // Boolean field, default true
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
 	IsAdmin     bool      `gorm:"column:isadmin;default:false;not null"` // default false for user, true is used when  admin logins
+}
+
+func (Userdetail) TableName() string {
+	return "userdetails"
 }
 
 type Cart struct {
@@ -84,6 +92,15 @@ type OrderItem struct {
 	Product   Brand     `gorm:"foreignKey:ProductID;references:ID"` // Relation to Brand, orderid is foreign key to order table, a table le primary id anne ivide reference id ayite irikane
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`
+}
+
+type UserFavoriteBrand struct {
+	ID       int64      `gorm:"primaryKey"`
+	UserID   int64      `gorm:"column:user_id;not null"`
+	User     Userdetail `gorm:"foreignKey:UserID"`
+	BrandID  int64      `gorm:"column:brand_id;not null"`
+	Brand    Brand      `gorm:"foreignKey:BrandID"`
+	Favorite bool       `gorm:"column:favorite;default:false;not null"`
 }
 
 func (r *UserRepoImpl) SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error) {
@@ -333,46 +350,6 @@ func (r *UserRepoImpl) ClearCart(userID int64) error {
 	return nil
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems []Cart) (*Order, []OrderItem, error) {
-// 	// Create the order
-// 	newOrder := &Order{
-// 		UserID: userID,
-// 		Total:  totalAmount,
-// 	}
-
-// 	if err := r.db.Create(newOrder).Error; err != nil {
-// 		return nil, nil, err
-// 	}
-
-// 	// Create order items
-// 	var createdItems []OrderItem
-// 	for _, item := range cartItems {
-// 		// Get complete brand details
-// 		var brand Brand
-// 		if err := r.db.Where("id = ?", item.ProductID).First(&brand).Error; err != nil {
-// 			return nil, nil, fmt.Errorf("failed to get brand details for product ID %d: %w", item.ProductID, err)
-// 		}
-
-// 		orderItem := OrderItem{
-// 			OrderID:   newOrder.ID,
-// 			ProductID: item.ProductID,
-// 			Quantity:  item.Quantity,
-// 			Price:     item.Price,
-// 			Product:   brand,
-// 		}
-
-// 		if err := r.db.Create(&orderItem).Error; err != nil {
-// 			return nil, nil, err
-// 		}
-
-// 		createdItems = append(createdItems, orderItem)
-// 	}
-
-// 	return newOrder, createdItems, nil
-// }
-
 func (r *UserRepoImpl) GetUserByID(userID int64) (*Userdetail, error) {
 	var user Userdetail
 	if err := r.db.Where("id = ?", userID).First(&user).Error; err != nil {
@@ -431,4 +408,81 @@ func (r *UserRepoImpl) CreateOrder(userID int64, totalAmount float64, cartItems 
 	}
 
 	return newOrder, createdItems, nil
+}
+
+func (r *UserRepoImpl) GetOrderHistoryByUserID(userID int64) ([]Order, error) {
+	var orders []Order
+
+	err := r.db.
+		Preload("Items").Preload("Items.Product").Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Find(&orders).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("no orders found for user with ID %d", userID)
+		}
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func (r *UserRepoImpl) AddOrUpdateFavorite(userID int64, args dto.UserFavoriteBrandRequest) error {
+	var fav UserFavoriteBrand
+
+	// Check if the favorite entry already exists
+	err := r.db.Table("user_favorite_brands").Where("user_id = ? AND brand_id = ?", userID, args.BrandID).First(&fav).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// Not found: create a new record
+		newFav := UserFavoriteBrand{
+			UserID:   userID,
+			BrandID:  args.BrandID,
+			Favorite: args.Favorite,
+		}
+
+		if err := r.db.Table("user_favorite_brands").Create(&newFav).Error; err != nil {
+			return err
+		}
+		return nil
+	} else if err != nil {
+		// Any other DB error
+		return err
+	}
+
+	// Record exists: update the favorite field
+	fav.Favorite = args.Favorite
+	if err := r.db.Table("user_favorite_brands").Save(&fav).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *UserRepoImpl) GetFavoriteBrandIDs(userID int64) ([]int64, error) {
+	var favs []UserFavoriteBrand
+	err := r.db.Where("user_id = ? AND favorite = true", userID).Find(&favs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	brandIDs := make([]int64, len(favs))
+	for i, fav := range favs {
+		brandIDs[i] = fav.BrandID
+	}
+	return brandIDs, nil
+}
+
+func (r *UserRepoImpl) GetBrandsByIDs(brandIDs []int64) ([]Brand, error) {
+	if len(brandIDs) == 0 {
+		return []Brand{}, nil
+	}
+
+	var brands []Brand
+	err := r.db.Where("id IN ?", brandIDs).Find(&brands).Error
+	if err != nil {
+		return nil, err
+	}
+	return brands, nil
 }

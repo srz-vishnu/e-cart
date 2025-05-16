@@ -8,7 +8,7 @@ import (
 )
 
 type AddItemToCart struct {
-	UserID     int64 `json:"userid"`
+	//UserID     int64 `json:"userid"`
 	CategoryID int64 `json:"category_id"`
 	Quantity   int64 `json:"quantity"`
 	BrandId    int64 `json:"brandid"`

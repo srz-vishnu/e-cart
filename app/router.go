@@ -26,7 +26,7 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 	// Admin part
 	adminRepo := internal.NewAdminRepo(db)
-	adminService := service.NewAdminService(adminRepo)
+	adminService := service.NewAdminService(adminRepo, urRepo)
 	adminController := controller.NewAdminController(adminService)
 
 	r.Route("/", func(r chi.Router) {
@@ -44,6 +44,8 @@ func APIRouter(db *gorm.DB) chi.Router {
 		r.Delete("/cart/clear", urController.ClearCart)
 		r.Post("/cart/placeorder", urController.PlaceOrder)
 		r.Get("/order/history", urController.OrderHistory)
+		r.Post("/favourite", urController.AddItemsToFavourites)
+		r.Get("/favourite", urController.GetUserFavouriteItems)
 	})
 
 	// Product routes — JWT middleware applied
@@ -66,6 +68,10 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 		r.Put("/block/{userid}", adminController.BlockUser)     // admin only
 		r.Put("/unblock/{userid}", adminController.UnBlockUser) // admin only
+		r.Get("/userdetails", adminController.GetAllUserDetail)
+		r.Get("/block/userdetails", adminController.GetAllBlockedUserDetail) //admin only
+		r.Get("/order/history/{id}", adminController.CustomerOrderHistoryById)
+		r.Get("/getall/order/history", adminController.CustomerOrderHistory)
 	})
 
 	return r

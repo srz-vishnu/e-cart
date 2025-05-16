@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 type ProductService interface {
@@ -45,22 +46,34 @@ func (s *ProductServiceImpl) CreateProduct(r *http.Request) (*dto.CreateProductR
 	}
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
-	Product_id, err := s.productRepo.CreateAndUpsertProductDetail(args)
+	category, err := s.productRepo.CreateAndUpsertProductDetail(args)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateProduct, "Failed to save product details", err)
 	}
-	log.Info().Msgf("Successfully added product details %d", Product_id)
+	log.Info().Msgf("Successfully added product details %d", category.ID)
+
+	var brands []dto.BrandResponse
+	for _, b := range category.Brands {
+		brands = append(brands, dto.BrandResponse{
+			BrandName:  b.BrandName,
+			Price:      b.Price,
+			StockCount: b.StockCount,
+			ImageLink:  b.ImageLink,
+		})
+	}
 
 	return &dto.CreateProductResponds{
-		ProductID: Product_id,
+		ProductID:   category.ID,
+		Category:    category.Categoryname,
+		Description: category.Description,
+		Brands:      brands,
 	}, nil
 }
 
 func (s *ProductServiceImpl) ListAllProduct(r *http.Request) ([]*dto.CatagoryListResponse, error) {
-
 	allCatagoryLists, err := s.productRepo.GetAllProducts()
 	if err != nil {
-		return nil, e.NewError(e.ErrValidateRequest, "error while listing all product items", err)
+		return nil, e.NewError(e.ErrListProducts, "error while listing all product items", err)
 	}
 	log.Info().Msgf("Successfully got all product details %v", allCatagoryLists)
 
@@ -73,14 +86,7 @@ func (s *ProductServiceImpl) ListAllProduct(r *http.Request) ([]*dto.CatagoryLis
 			Description:  pro.Description,
 		}
 		catagorylists = append(catagorylists, &prodlist)
-		//fmt.Printf("all product details: %v", catagorylists)
 		fmt.Printf("Category ID: %d, Name: %s, Description: %s\n", prodlist.CatagoryID, prodlist.CatagoryName, prodlist.CatagoryName)
-
-	}
-
-	// Print each product's details directly
-	for _, cat := range catagorylists {
-		fmt.Printf("Category ID: %d, Name: %s, Description: %s\n", cat.CatagoryID, cat.CatagoryName, cat.Description)
 	}
 
 	return catagorylists, nil
@@ -98,7 +104,10 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CategoryDeta
 
 	cat, err := s.productRepo.GetCategoryByID(args.CatagoryId)
 	if err != nil {
-		return nil, e.NewError(e.ErrCreateBook, "error while catagory detials", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, e.NewError(e.ErrCategoryNotFound, "category not found", err)
+		}
+		return nil, e.NewError(e.ErrGetCategory, "error while getting category details", err)
 	}
 
 	// Map the category and brand data to the DTO
@@ -119,11 +128,9 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CategoryDeta
 	}
 
 	return &response, nil
-
 }
 
 func (s *ProductServiceImpl) GetCatagoryByName(r *http.Request) (*dto.CategoryDetailResponse, error) {
-
 	args := &dto.SearchProductByNameRequest{}
 
 	err := args.Parse(r)
@@ -134,7 +141,10 @@ func (s *ProductServiceImpl) GetCatagoryByName(r *http.Request) (*dto.CategoryDe
 
 	categoryDetails, err := s.productRepo.GetCategoryByName(args.CategoryName)
 	if err != nil {
-		return nil, e.NewError(e.ErrCreateBook, "error while getting category details by name", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, e.NewError(e.ErrCategoryNotFound, "category not found", err)
+		}
+		return nil, e.NewError(e.ErrGetCategory, "error while getting category details by name", err)
 	}
 
 	var response dto.CategoryDetailResponse
@@ -156,10 +166,9 @@ func (s *ProductServiceImpl) GetCatagoryByName(r *http.Request) (*dto.CategoryDe
 }
 
 func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailResponse, error) {
-
 	allBrandList, err := s.productRepo.GetAllBrands()
 	if err != nil {
-		return nil, e.NewError(e.ErrCreateBook, "error while getting all brands", err)
+		return nil, e.NewError(e.ErrGetBrand, "error while getting all brands", err)
 	}
 	log.Info().Msgf("Successfully got all brand details %v \n", allBrandList)
 
@@ -178,22 +187,16 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 		fmt.Printf("brand items %v", brandLists)
 	}
 
-	// Print each product's details directly
-	for _, brand := range brandLists {
-		fmt.Printf(" Brand name: %s, Brand_Id: %d, price: %v, categoryID: %d  stockcount: %d\n", brand.BrandName, brand.BrandId, brand.Price, brand.CategoryID, brand.StockCount)
-	}
-
 	return brandLists, nil
 }
 
 // UpdateCategory updates the category name
 func (s *ProductServiceImpl) UpdateCategory(r *http.Request) error {
-
 	args := &dto.UpdateCategory{}
 
 	err := args.Parse(r)
 	if err != nil {
-		return nil
+		return e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
 	}
 
 	//validation
@@ -204,9 +207,17 @@ func (s *ProductServiceImpl) UpdateCategory(r *http.Request) error {
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
 	if args.CategoryName == "" {
-		return errors.New("category name cannot be empty")
+		return e.NewError(e.ErrValidateRequest, "category name cannot be empty", nil)
 	}
-	return s.productRepo.UpdateCategory(args.CategoryID, args.CategoryName)
+
+	err = s.productRepo.UpdateCategory(args.CategoryID, args.CategoryName)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return e.NewError(e.ErrCategoryNotFound, "category not found", err)
+		}
+		return e.NewError(e.ErrUpdateCategory, "failed to update category", err)
+	}
+	return nil
 }
 
 // UpdateBrand updates the brand name
@@ -226,11 +237,15 @@ func (s *ProductServiceImpl) UpdateBrand(r *http.Request) error {
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
 	if args.BrandName == "" {
-		return errors.New("brand name cannot be empty")
+		return e.NewError(e.ErrValidateRequest, "brand name cannot be empty", nil)
 	}
+
 	err = s.productRepo.UpdateBrand(args.BrandId, args.BrandName, args.Price)
 	if err != nil {
-		return e.NewError(e.ErrCreateBook, "no such id", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return e.NewError(e.ErrBrandNotFound, "brand not found", err)
+		}
+		return e.NewError(e.ErrUpdateBrand, "failed to update brand", err)
 	}
 	return nil
 }

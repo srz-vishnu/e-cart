@@ -1,0 +1,242 @@
+DATABASE SCHEMA DETAILED DIAGRAM
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                                  EMPLOYEE                                    │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ PK: Id                                                                       │
+│ FirstName                                                                    │
+│ LastName                                                                     │
+│ Email                                                                        │
+│ ContractorIDNoOrPPNo                                                         │
+│ FK: ContractingCompanyId → CONTRACTINGCOMPANYMASTER.Id                       │
+│ FK: JobId → JOBTYPE.Id                                                       │
+│ FK: UnitId → UNIT.Id                                                         │
+│ FK: RoleId → ROLE.Id                                                         │
+│ FK: projectId → PROJECTTYPE.Id                                               │
+│ IsActive                                                                     │
+│ CreatedOn                                                                    │
+│ UpdatedOn                                                                    │
+└───────────────┬───────────────┬───────────────┬───────────────┬──────────────┘
+                │               │               │               │
+                ▼               ▼               ▼               ▼
+┌─────────────────────┐ ┌───────────────┐ ┌───────────────┐ ┌─────────────────┐
+│    EMPLOYEELOGIN    │ │    REWARD     │ │    TICKET     │ │ CONTRACTING     │
+├─────────────────────┤ ├───────────────┤ ├───────────────┤ │ COMPANYMASTER   │
+│ PK: Id              │ │ PK: id        │ │ PK: Id        │ ├─────────────────┤
+│ FK: EmployeeId →    │ │ FK: EmployeeId│ │ TicketNumber  │ │ PK: Id          │
+│      EMPLOYEE.Id    │ │    → EMPLOYEE.│ │ FK: IssuedTo  │ │ Name            │
+│ UserName            │ │      Id       │ │    EmpId →    │ │ CreatedOn       │
+│ Password            │ │ FK: RewardId →│ │    EMPLOYEE.Id│ │ UpdatedOn       │
+└─────────────────────┘ │    ASSET.Id   │ │ FK: IssuedBy  │ │ IsActive        │
+                        │ IssueAt       │ │    EmpId →    │ └─────────────────┘
+                        └───────────────┘ │    EMPLOYEE.Id│
+                                          │ FK: TicketType│
+                                          │    Id →       │
+                                          │    TIKCETTYPE.│
+                                          │    Id         │
+                                          │ FK: UnitDLId →│
+                                          │    EMPLOYEE.Id│
+                                          │ FK: Coordinator│
+                                          │    Id →       │
+                                          │    EMPLOYEE.Id│
+                                          │ FK: LeaderId →│
+                                          │    EMPLOYEE.Id│
+                                          │ Observations  │
+                                          │ CreatedOn     │
+                                          │ UpdatedOn     │
+                                          │ IsActive      │
+                                          │ Remarks       │
+                                          │ Status        │
+                                          │ Warning       │
+                                          │ Next          │
+                                          │ Ticket_command│
+                                          │ Warning_command│
+                                          │ Termination_command│
+                                          │ leader_termination_comment│
+                                          │ leader_cancel_comment│
+                                          └───────┬───────┘
+                                                  │
+                                                  ▼
+┌─────────────────┐ ┌───────────────┐ ┌───────────────┐ ┌─────────────────────┐
+│     ASSET       │ │  JOBTYPE      │ │    ROLE       │ │       UNIT          │
+├─────────────────┤ ├───────────────┤ ├───────────────┤ ├─────────────────────┤
+│ PK: Id          │ │ PK: Id        │ │ PK: Id        │ │ PK: Id              │
+│ Name            │ │ Name          │ │ Name          │ │ Name                │
+│ Count           │ │ CreatedOn     │ │ Description   │ │ CreatedOn           │
+│ ticket_eligibili│ │ UpdatedOn     │ │ CreatedOn     │ │ UpdatedOn           │
+│ ty_count        │ │ IsActive      │ │ UpdatedOn     │ │ IsActive            │
+└─────────────────┘ └───────────────┘ │ IsActive      │ └─────────────────────┘
+                                      └───────────────┘
+┌─────────────────┐ ┌───────────────┐ ┌─────────────────────┐
+│  PROJECTTYPE    │ │  TIKCETTYPE   │ │ TICKETACTIONTYPES   │
+├─────────────────┤ ├───────────────┤ ├─────────────────────┤
+│ PK: Id          │ │ PK: Id        │ │ PK: Id              │
+│ Name            │ │ Name          │ │ Name                │
+│ CreatedOn       │ │ CreatedOn     │ │ CreatedOn           │
+│ UpdatedOn       │ │ UpdatedOn     │ │ UpdatedOn           │
+│ IsActive        │ │ IsActive      │ │ IsActive            │
+└─────────────────┘ └───────────────┘ └─────────────────────┘
+
+
+///////////////////////////// ////////////////////////////   /////////////////////////////////////////////////////////////////////
+
+                                    +-------------------+
+                                    |    projecttype    |
+                                    +-------------------+
+                                    | Id (PK)          |
+                                    +-------------------+
+                                            ▲
+                                            |
++-----------------------+          +-------------------+          +------------------------+
+|  contractingcompany   |          |     employee     |          |          unit         |
++-----------------------+          +-------------------+          +------------------------+
+| Id (PK)              |◄---------| ContractingComp.Id|          | Id (PK)              |
++-----------------------+          | Id (PK)           |          +------------------------+
+                                  | JobId (FK)         |                    ▲
+                                  | UnitId (FK)        |--------------------+
+                                  | RoleId (FK)        |
+                                  | projectId (FK)     |          +------------------------+
+                                  +-------------------+          |          role          |
+                                          ▲    ▲               +------------------------+
+                                         |    |               | Id (PK)               |
+                                          |    +---------------+                        |
+                                          |                    +------------------------+
+                                          |
+                                  +-------------------+          +------------------------+
+                                  |    employeelogin  |          |         asset         |
+                                  +-------------------+          +------------------------+
+                                  | Id (PK)           |          | Id (PK)              |
+                                  | EmployeeId (FK)   |          +------------------------+
+                                  +-------------------+                     ▲
+                                                                          |
+                                  +-------------------+          +------------------------+
+                                  |      ticket      |          |        reward         |
+                                  +-------------------+          +------------------------+
+                                  | Id (PK)           |          | id (PK)              |
+                                  | IssuedToEmpId(FK) |          | EmployeeId (FK)      |
+                                  | IssuedByEmpId(FK) |          | RewardId (FK)        |
+                                  | TicketTypeId (FK) |          +------------------------+
+                                  | UnitDLId (FK)     |
+                                  | CoordinatorId (FK)|          +------------------------+
+                                  | LeaderId (FK)     |          |      tikcettype      |
+                                  +-------------------+          +------------------------+
+                                          |                     | Id (PK)               |
+                                          +-------------------->+                        |
+                                                              +------------------------+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+[employee]
+- Id (PK)
+- FirstName
+- LastName
+- Email
+- ContractorIDNoOrPPNo
+- ContractingCompanyId (FK -> contractingcompanymaster.Id)
+- JobId (FK -> jobtype.Id)
+- UnitId (FK -> unit.Id)
+- RoleId (FK -> role.Id)
+- projectId (FK -> projecttype.Id)
+- IsActive
+- CreatedOn
+- UpdatedOn
+
+[employeelogin]
+- Id (PK)
+- EmployeeId (FK -> employee.Id)
+- UserName
+- Password
+
+[ticket]
+- Id (PK)
+- TicketNumber
+- IssuedToEmpId (FK -> employee.Id)
+- IssuedByEmpId (FK -> employee.Id)
+- TicketTypeId (FK -> tikcettype.Id)
+- UnitDLId (FK -> employee.Id)
+- CoordinatorId (FK -> employee.Id)
+- LeaderId (FK -> employee.Id)
+- Observations
+- CreatedOn
+- UpdatedOn
+- IsActive
+- Remarks
+- Status
+- Warning
+- Next
+- Ticket_command
+- Warning_command
+- Termination_command
+- leader_termination_comment
+- leader_cancel_comment
+
+[reward]
+- id (PK)
+- EmployeeId (FK -> employee.Id)
+- RewardId (FK -> asset.Id)
+- IssueAt
+
+[asset]
+- Id (PK)
+- Name
+- Count
+- ticket_eligibility_count
+
+[contractingcompanymaster]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[jobtype]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[projecttype]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[role]
+- Id (PK)
+- Name
+- Description
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[unit]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[tikcettype]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+[ticketactiontypes]
+- Id (PK)
+- Name
+- CreatedOn
+- UpdatedOn
+- IsActive
+
+excel sheet data we have 

@@ -13,7 +13,7 @@ type BlockUserRequest struct {
 }
 
 func (args *BlockUserRequest) Parse(r *http.Request) error {
-	strID := chi.URLParam(r, "useridid")
+	strID := chi.URLParam(r, "userid")
 	intID, err := strconv.Atoi(strID)
 	if err != nil {
 		return fmt.Errorf("invalid user ID to block")
