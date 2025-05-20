@@ -31,8 +31,8 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@v2
         with:
           args: >
-            -Dsonar.projectKey=your-sonarcloud-project-key
-            -Dsonar.organization=your-org-name
+            -Dsonar.projectKey=srz-vishnu_e-cart
+            -Dsonar.organization=srz-vishnu
             -Dsonar.host.url=https://sonarcloud.io
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
