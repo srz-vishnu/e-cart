@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"e-cart/app/dto"
 	helper "e-cart/app/helper"
 	"e-cart/app/internal"
@@ -29,6 +30,28 @@ type UserService interface {
 
 type userServiceImpl struct {
 	userRepo internal.UserRepo
+}
+
+// Helper method to get user ID and check user status
+func (s *userServiceImpl) getUserIDAndCheckStatus(ctx context.Context) (int64, error) {
+	userID, err := helper.GetUserIDFromContext(ctx)
+	if err != nil {
+		return 0, e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
+	}
+	log.Info().Msgf("userId of the user logged in %d", userID)
+
+	isActive, err := s.userRepo.IsUserActive(userID)
+	if err != nil {
+		return 0, e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
+	}
+
+	if !isActive {
+		log.Info().Msg("User is not active.")
+		return 0, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
+	}
+	log.Info().Msg("User is active")
+
+	return userID, nil
 }
 
 func NewUserService(userRepo internal.UserRepo) UserService {
@@ -138,24 +161,12 @@ func (s *userServiceImpl) UpdateUserDetails(r *http.Request) error {
 	}
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
-	UserId, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserId)
-
-	isActive, err := s.userRepo.IsUserActive(UserId)
-	if err != nil {
-		return e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
+		return err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	err = s.userRepo.UpdateUserDetails(args, args.UserID)
+	err = s.userRepo.UpdateUserDetails(args, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return e.NewError(e.ErrUserNotFound, "user not found in the table", err)
@@ -170,22 +181,10 @@ func (s *userServiceImpl) UpdateUserDetails(r *http.Request) error {
 func (s *userServiceImpl) AddItemToCart(r *http.Request) (*dto.CartItemResponse, error) {
 	args := &dto.AddItemToCart{}
 
-	UserId, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return nil, e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
+		return nil, err
 	}
-	log.Info().Msgf("userId of the user logged in %d", UserId)
-
-	isActive, err := s.userRepo.IsUserActive(UserId)
-	if err != nil {
-		return nil, e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
-	}
-
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return nil, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
 
 	err = args.Parse(r)
 	if err != nil {
@@ -219,14 +218,14 @@ func (s *userServiceImpl) AddItemToCart(r *http.Request) (*dto.CartItemResponse,
 	log.Info().Msgf("totalAmount is %v :", totalAmount)
 
 	// checking product already exist in cart, if not adding those items
-	err = s.userRepo.AddOrUpdateCart(UserId, prodDetails, args.Quantity, totalAmount)
+	err = s.userRepo.AddOrUpdateCart(userID, prodDetails, args.Quantity, totalAmount)
 	if err != nil {
 		return nil, e.NewError(e.ErrAddToCart, "error while adding items to the cart", err)
 	}
 	log.Info().Msg("Successfully added items to the cart")
 
 	// Get the updated cart details along with product info
-	cartData, err := s.userRepo.GetCartWithProductDetails(UserId, prodDetails.ID)
+	cartData, err := s.userRepo.GetCartWithProductDetails(userID, prodDetails.ID)
 	if err != nil {
 		return nil, e.NewError(e.ErrGetCartDetails, "error while retrieving cart with product details", err)
 	}
@@ -247,24 +246,12 @@ func (s *userServiceImpl) AddItemToCart(r *http.Request) (*dto.CartItemResponse,
 }
 
 func (s *userServiceImpl) ViewUserCart(r *http.Request) ([]*dto.ViewCart, error) {
-	UserId, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return nil, e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserId)
-
-	isActive, err := s.userRepo.IsUserActive(UserId)
-	if err != nil {
-		return nil, e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
+		return nil, err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return nil, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	cartDetails, err := s.userRepo.ViewCart(UserId)
+	cartDetails, err := s.userRepo.ViewCart(userID)
 	if err != nil {
 		return nil, e.NewError(e.ErrViewCart, "not able to see the cart associated with the user", err)
 	}
@@ -287,24 +274,12 @@ func (s *userServiceImpl) ViewUserCart(r *http.Request) ([]*dto.ViewCart, error)
 }
 
 func (s *userServiceImpl) ClearCart(r *http.Request) error {
-	UserId, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserId)
-
-	isActive, err := s.userRepo.IsUserActive(UserId)
-	if err != nil {
-		return e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
+		return err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	err = s.userRepo.ClearCart(UserId)
+	err = s.userRepo.ClearCart(userID)
 	if err != nil {
 		return e.NewError(e.ErrClearCart, "failed to clear cart", err)
 	}
@@ -314,22 +289,10 @@ func (s *userServiceImpl) ClearCart(r *http.Request) error {
 }
 
 func (s *userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse, error) {
-	UserId, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return nil, e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
+		return nil, err
 	}
-	log.Info().Msgf("userId of the user logged in %d", UserId)
-
-	isActive, err := s.userRepo.IsUserActive(UserId)
-	if err != nil {
-		return nil, e.NewError(e.ErrGetUserDetails, "error while checking user details", err)
-	}
-
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return nil, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
 
 	args := dto.PlaceOrderFromCart{}
 
@@ -346,7 +309,7 @@ func (s *userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse,
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
 	// Fetch cart items
-	cartItems, err := s.userRepo.FetchCartItems(UserId, args.CartID)
+	cartItems, err := s.userRepo.FetchCartItems(userID, args.CartID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, e.NewError(e.ErrCartNotFound, "cart not found", err)
@@ -362,14 +325,14 @@ func (s *userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse,
 	log.Info().Msgf("totalAmount is %v :", totalAmount)
 
 	// Create order and items in a single transaction
-	newOrder, orderItems, err := s.userRepo.CreateOrder(UserId, totalAmount, cartItems)
+	newOrder, orderItems, err := s.userRepo.CreateOrder(userID, totalAmount, cartItems)
 	if err != nil {
 		return nil, e.NewError(e.ErrPlaceOrder, "error while creating order", err)
 	}
 	log.Info().Msgf("Order ID: %d, Total: %.2f, UserID: %d", newOrder.ID, newOrder.Total, newOrder.UserID)
 
 	// Get user details for response
-	user, err := s.userRepo.GetUserByID(UserId)
+	user, err := s.userRepo.GetUserByID(userID)
 	if err != nil {
 		return nil, e.NewError(e.ErrGetUserDetails, "error while fetching user details", err)
 	}
@@ -381,7 +344,7 @@ func (s *userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse,
 	}
 
 	// Update cart status
-	err = s.userRepo.UpdateCartOrderStatus(UserId, newOrder.ID, args.CartID)
+	err = s.userRepo.UpdateCartOrderStatus(userID, newOrder.ID, args.CartID)
 	if err != nil {
 		return nil, e.NewError(e.ErrUpdateCart, "error while updating cart status", err)
 	}
@@ -415,29 +378,17 @@ func (s *userServiceImpl) PlaceOrder(r *http.Request) (*dto.ItemOrderedResponse,
 }
 
 func (s *userServiceImpl) OrderHistory(r *http.Request) ([]*dto.ItemOrderedResponse, error) {
-	UserID, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return nil, e.NewError(e.ErrContextError, "Failed to get userId", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserID)
-
-	isActive, err := s.userRepo.IsUserActive(UserID)
-	if err != nil {
-		return nil, e.NewError(e.ErrGetUserDetails, "failed to check user status", err)
+		return nil, err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return nil, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	userDetails, err := s.userRepo.GetUserByID(UserID)
+	userDetails, err := s.userRepo.GetUserByID(userID)
 	if err != nil {
 		return nil, e.NewError(e.ErrGetUserDetails, "failed to get user details", err)
 	}
 
-	orderHistory, err := s.userRepo.GetOrderHistoryByUserID(UserID)
+	orderHistory, err := s.userRepo.GetOrderHistoryByUserID(userID)
 	if err != nil {
 		return nil, e.NewError(e.ErrGetOrderHistory, "failed to get order history", err)
 	}
@@ -490,24 +441,12 @@ func (s *userServiceImpl) AddItemsToFavourites(r *http.Request) error {
 	}
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
-	UserID, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return e.NewError(e.ErrContextError, "Failed to get userId", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserID)
-
-	isActive, err := s.userRepo.IsUserActive(UserID)
-	if err != nil {
-		return e.NewError(e.ErrGetUserDetails, "failed to check user status", err)
+		return err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	err = s.userRepo.AddOrUpdateFavorite(UserID, args)
+	err = s.userRepo.AddOrUpdateFavorite(userID, args)
 	if err != nil {
 		return e.NewError(e.ErrAddToFavorites, "failed to update brand to the favourite list", err)
 	}
@@ -517,24 +456,12 @@ func (s *userServiceImpl) AddItemsToFavourites(r *http.Request) error {
 }
 
 func (s *userServiceImpl) GetUserFavouriteBrands(r *http.Request) ([]dto.FavoriteBrandResponse, error) {
-	UserID, err := helper.GetUserIDFromContext(r.Context())
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
-		return nil, e.NewError(e.ErrContextError, "Failed to get userId", err)
-	}
-	log.Info().Msgf("userId of the user logged in %d", UserID)
-
-	isActive, err := s.userRepo.IsUserActive(UserID)
-	if err != nil {
-		return nil, e.NewError(e.ErrGetUserDetails, "failed to check user status", err)
+		return nil, err
 	}
 
-	if !isActive {
-		log.Info().Msg("User is not active.")
-		return nil, e.NewError(e.ErrUserBlocked, "user is blocked or inactive", nil)
-	}
-	log.Info().Msg("User is active")
-
-	brandIDs, err := s.userRepo.GetFavoriteBrandIDs(UserID)
+	brandIDs, err := s.userRepo.GetFavoriteBrandIDs(userID)
 	if err != nil {
 		return nil, e.NewError(e.ErrGetFavorites, "failed to get favorite brand IDs", err)
 	}
