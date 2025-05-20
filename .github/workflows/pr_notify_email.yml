@@ -1,0 +1,37 @@
+name: PR Notification Email
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  send-email:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send email notification
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{secrets.EMAIL_USERNAME}}
+          password: ${{secrets.EMAIL_PASSWORD}}
+          subject: New PR opened in ${{github.repository}}
+          body: |
+            A new pull request has been opened by ${{github.actor}} at ${{ github.event.pull_request.created_at }}.
+            
+            PR Title: ${{github.event.pull_request.title}}
+            PR Description: ${{github.event.pull_request.body}}
+
+            Source Branch: ${{ github.event.pull_request.head.ref }}
+            Target Branch: ${{ github.event.pull_request.base.ref }}
+
+            PR Details:
+            - Changed Files: ${{ github.event.pull_request.changed_files }}
+            - Additions: +${{ github.event.pull_request.additions }}
+            - Deletions: -${{ github.event.pull_request.deletions }}
+            - Commits: ${{ github.event.pull_request.commits }}
+            
+            You can view the PR here: ${{github.event.pull_request.html_url}}
+          to: ${{secrets.EMAIL_RECIPIENTS}}
+          from: ${{secrets.EMAIL_USERNAME}}
+          secure: true
