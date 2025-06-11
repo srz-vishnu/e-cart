@@ -24,6 +24,14 @@ const (
 	// ErrCreateUser : error when creating user
 	ErrCreateUser
 
+	// ErrUserNameAlreadyExists : error when username already exists in db
+	ErrUserNameAlreadyExists
+
+	ErrInternal
+
+	// ErrGetUserDetails : error when getting user details
+	ErrGetUserDetails
+
 	// ErrGetAuthorById : error when getting author by id
 	ErrGetAuthorById
 
@@ -41,9 +49,6 @@ const (
 
 	// ErrUnblockUser : error while unblocking a user
 	ErrUnblockUser
-
-	// ErrGetUserDetails : error while getting user details
-	ErrGetUserDetails
 
 	// ErrGetOrderHistory : error while getting order history
 	ErrGetOrderHistory
@@ -94,6 +99,12 @@ const (
 
 	// ErrInvalidCredentials : error when credentials are invalid
 	ErrInvalidCredentials
+
+	// ErrMismatchingPassword : error when new and confirm passwords are mismatched
+	ErrMismatchingPassword
+
+	// ErrHashPassword : error when hashing the password
+	ErrHashPassword
 
 	// ErrUserBlocked : error when user is blocked
 	ErrUserBlocked

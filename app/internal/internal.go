@@ -13,6 +13,8 @@ import (
 type UserRepo interface {
 	SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error)
 	GetUserByUsername(username string) (*Userdetail, error)
+	ChangePassword(userID int64, hashedPwd string) error
+	GetUserDetailByID(userId int64) (*Userdetail, error)
 	UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error
 	IsUserActive(userID int64) (bool, error)
 	GetProductDetails(productID, categoryID int64) (*Brand, error)
@@ -106,7 +108,7 @@ type UserFavoriteBrand struct {
 func (r *UserRepoImpl) SaveUserDetails(args *dto.UserDetailSaveRequest) (int64, error) {
 
 	user := Userdetail{
-		ID:          args.UserID,
+		//ID:          args.UserID,
 		Address:     args.Address,
 		Mail:        args.Mail,
 		Username:    args.UserName,
@@ -130,13 +132,21 @@ func (r *UserRepoImpl) GetUserByUsername(username string) (*Userdetail, error) {
 	return &user, nil
 }
 
+func (r *UserRepoImpl) GetUserDetailByID(userId int64) (*Userdetail, error) {
+	var user Userdetail
+	if err := r.db.Table("userdetails").Where("id = ?", userId).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *UserRepoImpl) UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error {
 
 	updates := map[string]interface{}{
-		"username":   args.UserName,
-		"mail":       args.Mail,
-		"address":    args.Address,
-		"password":   args.Password,
+		"username": args.UserName,
+		"mail":     args.Mail,
+		"address":  args.Address,
+		//"password":   args.Password,  commented password bcoz password updation should be done using an seperate api
 		"pincode":    args.Pincode,
 		"updated_at": time.Now(),
 	}
@@ -153,6 +163,14 @@ func (r *UserRepoImpl) UpdateUserDetails(args *dto.UpdateUserDetailRequest, User
 
 	log.SetFlags(0)
 	log.Println("user password updated successfully..")
+	return nil
+}
+
+func (r *UserRepoImpl) ChangePassword(userID int64, hashedPwd string) error {
+	// Use GORM's Update to modify only the password field
+	if err := r.db.Table("userdetails").Where("id = ?", userID).Update("password", hashedPwd).Error; err != nil {
+		return err
+	}
 	return nil
 }
 

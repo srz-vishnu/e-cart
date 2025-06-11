@@ -2,12 +2,15 @@ package app
 
 import (
 	"e-cart/app/controller"
+	"e-cart/app/helper"
 	"e-cart/app/internal"
 	"e-cart/app/service"
 	api "e-cart/pkg/api"
 	"e-cart/pkg/middleware"
+	"e-cart/pkg/utils"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +19,9 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 	// User part
 	urRepo := internal.NewUserRepo(db)
-	urService := service.NewUserService(urRepo)
+	hlRepo := helper.NewContextHelper()
+	hashPkg := utils.NewBcryptPackage()
+	urService := service.NewUserService(urRepo, hlRepo, hashPkg)
 	urController := controller.NewUserController(urService)
 
 	// Product part
@@ -29,6 +34,13 @@ func APIRouter(db *gorm.DB) chi.Router {
 	adminService := service.NewAdminService(adminRepo, urRepo)
 	adminController := controller.NewAdminController(adminService)
 
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowCredentials: true,
+	}))
+
 	r.Route("/", func(r chi.Router) {
 		r.Get("/hello", api.ExampleHamdler)
 		r.Post("/signup", urController.UserDetails)
@@ -39,6 +51,8 @@ func APIRouter(db *gorm.DB) chi.Router {
 	r.Route("/user", func(r chi.Router) {
 		r.Use(middleware.JWTAuthMiddleware) // All user routes require login
 		r.Put("/update/{userid}", urController.UpdateUserDetails)
+		r.Post("/chnage/pwd", urController.ChangePassword)
+		r.Get("/{userid}", urController.GetUserDetails)
 		r.Post("/cart/additem", urController.AddItemsToCart)
 		r.Get("/cart/view", urController.ViewUserCart)
 		r.Delete("/cart/clear", urController.ClearCart)

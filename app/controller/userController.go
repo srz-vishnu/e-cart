@@ -10,7 +10,9 @@ import (
 type UserController interface {
 	LoginUser(w http.ResponseWriter, r *http.Request)
 	UserDetails(w http.ResponseWriter, r *http.Request)
+	GetUserDetails(w http.ResponseWriter, r *http.Request)
 	UpdateUserDetails(w http.ResponseWriter, r *http.Request)
+	ChangePassword(w http.ResponseWriter, r *http.Request)
 	ViewUserCart(w http.ResponseWriter, r *http.Request)
 	ClearCart(w http.ResponseWriter, r *http.Request)
 	AddItemsToCart(w http.ResponseWriter, r *http.Request)
@@ -59,6 +61,27 @@ func (c *UserControllerImpl) UpdateUserDetails(w http.ResponseWriter, r *http.Re
 		return
 	}
 	api.Success(w, http.StatusOK, "success")
+}
+
+func (c *UserControllerImpl) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	err := c.userService.ChangePassword(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to chnage password")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, "success")
+}
+
+func (c *UserControllerImpl) GetUserDetails(w http.ResponseWriter, r *http.Request) {
+
+	resp, err := c.userService.GetUserDetails(r)
+	if err != nil {
+		apiErr := e.NewAPIError(err, "failed to get user details")
+		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())
+		return
+	}
+	api.Success(w, http.StatusOK, resp)
 }
 
 func (c *UserControllerImpl) AddItemsToCart(w http.ResponseWriter, r *http.Request) {
