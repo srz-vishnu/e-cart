@@ -7,9 +7,13 @@ import (
 	"e-cart/app/internal"
 	"e-cart/pkg/e"
 	"e-cart/pkg/jwt"
+	hash "e-cart/pkg/utils"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
 
 	"github.com/rs/zerolog/log"
 	"gorm.io/gorm"
@@ -19,6 +23,8 @@ type UserService interface {
 	SaveUserDetails(r *http.Request) (*dto.SaveUserResponse, error)
 	LoginUser(r *http.Request) (*dto.LoginResponse, error)
 	UpdateUserDetails(r *http.Request) error
+	GetUserDetails(r *http.Request) (*dto.GetUserDetailsResponse, error)
+	ChangePassword(r *http.Request) error
 	ViewUserCart(r *http.Request) ([]*dto.ViewCart, error)
 	ClearCart(r *http.Request) error
 	AddItemToCart(r *http.Request) (*dto.CartItemResponse, error)
@@ -29,12 +35,21 @@ type UserService interface {
 }
 
 type userServiceImpl struct {
-	userRepo internal.UserRepo
+	userRepo      internal.UserRepo
+	contextHelper helper.ContextHelper
+	bcryptPackage hash.BcryptPackage
 }
 
-// Helper method to get user ID and check user status
+func NewUserService(userRepo internal.UserRepo, ctxHelper helper.ContextHelper, hashPassword hash.BcryptPackage) UserService {
+	return &userServiceImpl{
+		userRepo:      userRepo,
+		contextHelper: ctxHelper,
+		bcryptPackage: hashPassword,
+	}
+}
+
 func (s *userServiceImpl) getUserIDAndCheckStatus(ctx context.Context) (int64, error) {
-	userID, err := helper.GetUserIDFromContext(ctx)
+	userID, err := s.contextHelper.GetUserID(ctx)
 	if err != nil {
 		return 0, e.NewError(e.ErrContextError, "error while getting userId from ctx", err)
 	}
@@ -54,12 +69,6 @@ func (s *userServiceImpl) getUserIDAndCheckStatus(ctx context.Context) (int64, e
 	return userID, nil
 }
 
-func NewUserService(userRepo internal.UserRepo) UserService {
-	return &userServiceImpl{
-		userRepo: userRepo,
-	}
-}
-
 func (s *userServiceImpl) SaveUserDetails(r *http.Request) (*dto.SaveUserResponse, error) {
 	args := &dto.UserDetailSaveRequest{}
 
@@ -76,6 +85,24 @@ func (s *userServiceImpl) SaveUserDetails(r *http.Request) (*dto.SaveUserRespons
 	}
 	log.Info().Msg("Successfully completed parsing and validation of request body")
 
+	// Check if username already exists
+	existingUser, err := s.userRepo.GetUserByUsername(args.UserName)
+	if err == nil && existingUser != nil {
+		log.Info().Msgf("Username %s is already exist", args.UserName)
+		return nil, e.NewError(e.ErrUserNameAlreadyExists, "username already exists", nil)
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Only return error if it's not 'record not found'
+		return nil, e.NewError(e.ErrInternal, "error checking existing user", err)
+	}
+
+	// hashing the password for protection
+	hashedPassword, err := s.bcryptPackage.HashPassword(args.Password)
+	if err != nil {
+		return nil, e.NewError(e.ErrHashPassword, "failed to hash password", err)
+	}
+	args.Password = hashedPassword
+
 	userID, err := s.userRepo.SaveUserDetails(args)
 	if err != nil {
 		return nil, e.NewError(e.ErrCreateUser, "error while creating user", err)
@@ -85,6 +112,129 @@ func (s *userServiceImpl) SaveUserDetails(r *http.Request) (*dto.SaveUserRespons
 	return &dto.SaveUserResponse{
 		UserId: userID,
 	}, nil
+}
+
+// func (s *userServiceImpl) GetUserDetails(r *http.Request) (*dto.GetUserDetailsResponse, error) {
+// 	strID := chi.URLParam(r, "userid")
+// 	intID, err := strconv.Atoi(strID)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	UserID := int64(intID)
+
+// 	userDetails, err := s.userRepo.GetUserDetailByID(UserID)
+// 	if err != nil {
+// 		return nil, e.NewError(e.ErrGetUserDetails, "failed to get user details", err)
+// 	}
+
+// 	if userDetails.IsAdmin {
+// 		log.Info().Msg("the user is an admin")
+// 	} else {
+// 		log.Info().Msg("the user is a regular user")
+// 	}
+
+// 	// Check if user is active
+// 	if !userDetails.Status {
+// 		err := fmt.Errorf("user %s is blocked", userDetails.Username)
+// 		return nil, e.NewError(e.ErrUserBlocked, "user is blocked", err)
+// 	}
+
+// 	response := &dto.GetUserDetailsResponse{
+// 		UserName: userDetails.Username,
+// 		Mail:     userDetails.Mail,
+// 		Phone:    userDetails.Phonenumber,
+// 		Address:  userDetails.Address,
+// 		Pincode:  userDetails.Pincode,
+// 	}
+
+// 	return response, nil
+// }
+
+func (s *userServiceImpl) ChangePassword(r *http.Request) error {
+	args := &dto.ChangePasswordRequest{}
+
+	userID, err := s.getUserIDAndCheckStatus(r.Context())
+	if err != nil {
+		return nil
+	}
+
+	err = args.Parse(r)
+	if err != nil {
+		return e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
+	}
+
+	err = args.Validate()
+	if err != nil {
+		return e.NewError(e.ErrValidateRequest, "error validating the req.body", err)
+	}
+	log.Info().Msg("Successfully completed parsing and validation of request body")
+
+	userDetails, err := s.userRepo.GetUserDetailByID(userID)
+	if err != nil {
+		return e.NewError(e.ErrGetUserDetails, "error while fetching user details", err)
+	}
+
+	// Validate password
+	if args.NewPassword != args.ConfirmPassword {
+		err := fmt.Errorf("mismatching password for user %s", userDetails.Username)
+		return e.NewError(e.ErrMismatchingPassword, "mismatching new password and current password", err)
+	}
+
+	// comparing the current hashed_pwd from db with pwd from front_end
+	passwordMatch := s.bcryptPackage.ComparePassword(userDetails.Password, args.CurrentPassword)
+	if !passwordMatch {
+		return e.NewError(e.ErrInvalidCredentials, "invalid password", nil)
+	}
+
+	hashPassword, err := s.bcryptPackage.HashPassword(args.NewPassword)
+	if err != nil {
+		return e.NewError(e.ErrHashPassword, "failed to hash password", err)
+	}
+
+	args.NewPassword = hashPassword
+
+	return nil
+}
+
+func (s *userServiceImpl) GetUserDetails(r *http.Request) (*dto.GetUserDetailsResponse, error) {
+	strID := chi.URLParam(r, "userid")
+	intID, err := strconv.Atoi(strID)
+	if err != nil {
+		return nil, err
+	}
+	userID := int64(intID)
+
+	// userID, err := s.getUserIDAndCheckStatus(r.Context())
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	userDetails, err := s.userRepo.GetUserDetailByID(userID)
+	if err != nil {
+		return nil, e.NewError(e.ErrGetUserDetails, "failed to get user details", err)
+	}
+
+	if userDetails.IsAdmin {
+		log.Info().Msg("the user is an admin")
+	} else {
+		log.Info().Msg("the user is a regular user")
+	}
+
+	// Check if user is active
+	if !userDetails.Status {
+		err := fmt.Errorf("user %s is blocked", userDetails.Username)
+		return nil, e.NewError(e.ErrUserBlocked, "user is blocked", err)
+	}
+
+	response := &dto.GetUserDetailsResponse{
+		UserName: userDetails.Username,
+		Mail:     userDetails.Mail,
+		Address:  userDetails.Address,
+		Pincode:  userDetails.Pincode,
+		Phone:    userDetails.Phonenumber,
+	}
+
+	return response, nil
 }
 
 func (s *userServiceImpl) LoginUser(r *http.Request) (*dto.LoginResponse, error) {
@@ -123,10 +273,29 @@ func (s *userServiceImpl) LoginUser(r *http.Request) (*dto.LoginResponse, error)
 		log.Info().Msg("the user is a regular user")
 	}
 
-	// Validate password
-	if user.Password != args.Password {
-		err := fmt.Errorf("invalid password for user %s", user.Username)
-		return nil, e.NewError(e.ErrInvalidCredentials, "invalid password", err)
+	// Validating password using comparePassword
+	// passwordMatch := s.bcryptPackage.ComparePassword(user.Password, args.Password)
+	// if !passwordMatch {
+	// 	return nil, e.NewError(e.ErrInvalidCredentials, "invalid password", nil)
+	// }
+
+	passwordMatch := s.bcryptPackage.ComparePassword(user.Password, args.Password)
+	if !passwordMatch {
+		log.Info().Msg("user is old, pwd is not hashed yet, so hash the old pwd and save it to db")
+		if user.Password == args.Password {
+			// Plaintext matched, so upgrade it to hashed password
+			hashedPwd, err := s.bcryptPackage.HashPassword(args.Password)
+			if err == nil {
+				_ = s.userRepo.ChangePassword(user.ID, hashedPwd)
+				log.Info().Msgf("Upgraded password to hashed format for user %s", user.Username)
+			} else {
+				//log.Error().Err(err).Msg("Failed to upgrade password hash")
+				return nil, e.NewError(e.ErrHashPassword, "failed to hash password", err)
+			}
+		} else {
+			// Neither match
+			return nil, e.NewError(e.ErrInvalidCredentials, "invalid password", nil)
+		}
 	}
 
 	// Check if user is active
@@ -164,6 +333,16 @@ func (s *userServiceImpl) UpdateUserDetails(r *http.Request) error {
 	userID, err := s.getUserIDAndCheckStatus(r.Context())
 	if err != nil {
 		return err
+	}
+
+	// Check if username already exists
+	existingUser, err := s.userRepo.GetUserByUsername(args.UserName)
+	if err == nil && existingUser != nil && existingUser.ID != userID {
+		return e.NewError(e.ErrUserNameAlreadyExists, "username already exists", nil)
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		// Only return error if it's not 'record not found'
+		return e.NewError(e.ErrInternal, "error checking existing user", err)
 	}
 
 	err = s.userRepo.UpdateUserDetails(args, userID)

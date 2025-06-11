@@ -16,7 +16,7 @@ type UpdateUserDetailRequest struct {
 	Address  string `json:"address" validate:"required"`
 	Pincode  int64  `json:"pincode" validate:"required"`
 	Phone    int64  `json:"phonenumber" validate:"required"`
-	Password string `json:"password" validate:"required"`
+	//Password string `json:"password" validate:"required"` commented password bcoz password updation should be done using an seperate api
 }
 
 func (args *UpdateUserDetailRequest) Parse(r *http.Request) error {

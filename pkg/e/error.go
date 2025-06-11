@@ -27,8 +27,15 @@ type HttpError struct {
 // }
 
 func (e *WrapError) Error() string {
-	return e.RootCause.Error()
+	if e.RootCause != nil {
+		return e.Msg + ": " + e.RootCause.Error()
+	}
+	return e.Msg
 }
+
+// func (e *WrapError) Error() string {
+// 	return e.RootCause.Error()
+// }
 
 // NewError : create a new error instance, get rootcause error and return as WrapError.
 func NewError(errCode int, msg string, rootCause error) *WrapError {
@@ -42,16 +49,37 @@ func NewError(errCode int, msg string, rootCause error) *WrapError {
 
 // NewAPIError : create http error from NewError to pass api.Fail.
 // err is expecting WrapError type.
+// func NewAPIError(err error, msg string) *HttpError {
+// 	if err == nil {
+// 		return nil
+// 	}
+// 	// checking err is type of WrapError
+// 	appErr, ok := err.(*WrapError)
+// 	if ok {
+// 		appErr.Msg = msg
+// 	} else {
+// 		return nil
+// 	}
+
+// 	httpErr := &HttpError{
+// 		StatusCode: GetHttpStatusCode(appErr.ErrorCode),
+// 		Code:       appErr.ErrorCode,
+// 		Message:    msg,
+// 	}
+// 	return httpErr
+// }
+
 func NewAPIError(err error, msg string) *HttpError {
 	if err == nil {
 		return nil
 	}
-	// checking err is type of WrapError
 	appErr, ok := err.(*WrapError)
-	if ok {
-		appErr.Msg = msg
-	} else {
+	if !ok {
 		return nil
+	}
+
+	if msg == "" {
+		msg = appErr.Msg
 	}
 
 	httpErr := &HttpError{
@@ -61,6 +89,7 @@ func NewAPIError(err error, msg string) *HttpError {
 	}
 	return httpErr
 }
+
 
 // GetHttpStatusCode used to get Status code from code provided
 func GetHttpStatusCode(c int) int {
