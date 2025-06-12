@@ -193,6 +193,12 @@ func (s *userServiceImpl) ChangePassword(r *http.Request) error {
 
 	args.NewPassword = hashPassword
 
+	err = s.userRepo.ChangePassword(userID, args.NewPassword)
+	if err != nil {
+		return e.NewError(e.ErrHashPassword, "failed to change the new password", err)
+	}
+	log.Info().Msg("Successfully updated password")
+
 	return nil
 }
 

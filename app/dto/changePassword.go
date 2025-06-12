@@ -8,9 +8,9 @@ import (
 )
 
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"currentpassword" validate:"required"`
-	NewPassword     string `json:"newpassword" validate:"required"`
-	ConfirmPassword string `json:"confirmpassword" validate:"required"`
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required"`
+	ConfirmPassword string `json:"confirm_password" validate:"required"`
 }
 
 func (args *ChangePasswordRequest) Parse(r *http.Request) error {

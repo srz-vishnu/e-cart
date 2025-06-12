@@ -51,7 +51,7 @@ func APIRouter(db *gorm.DB) chi.Router {
 	r.Route("/user", func(r chi.Router) {
 		r.Use(middleware.JWTAuthMiddleware) // All user routes require login
 		r.Put("/update/{userid}", urController.UpdateUserDetails)
-		r.Post("/chnage/pwd", urController.ChangePassword)
+		r.Post("/change/pwd", urController.ChangePassword)
 		r.Get("/{userid}", urController.GetUserDetails)
 		r.Post("/cart/additem", urController.AddItemsToCart)
 		r.Get("/cart/view", urController.ViewUserCart)
