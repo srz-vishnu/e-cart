@@ -127,8 +127,6 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CategoryDeta
 			BrandName:  brand.BrandName,
 			Price:      brand.Price,
 			StockCount: brand.StockCount,
-			Model:      brand.BrandName,
-			ImageLink:  brand.ImageLink,
 		}
 		response.Brands = append(response.Brands, brandResp)
 	}
