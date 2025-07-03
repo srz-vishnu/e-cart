@@ -20,8 +20,8 @@ type Claims struct {
 }
 
 // GenerateToken generates a new JWT token
-func GenerateToken(userID int64, username string, isadmin bool) (string, error) {
-	expirationTime := time.Now().Add(24 * time.Hour) // Token valid for 24 hours
+func GenerateToken(userID int64, username string, isadmin bool) (string, time.Time, error) {
+	expirationTime := time.Now().Add(3 * time.Hour) // Token valid for 3 hours
 	claims := &Claims{
 		UserID:   userID,
 		Username: username,
@@ -34,9 +34,9 @@ func GenerateToken(userID int64, username string, isadmin bool) (string, error) 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(jwtKey)
 	if err != nil {
-		return "", err
+		return "", time.Time{}, err
 	}
-	return tokenString, nil
+	return tokenString, expirationTime, nil
 }
 
 // ValidateToken validates the JWT token and checks for expiration

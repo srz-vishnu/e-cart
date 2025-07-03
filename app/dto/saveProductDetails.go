@@ -20,6 +20,7 @@ type BrandDetailRequest struct {
 	Price      float64 `json:"price" validate:"required"`
 	StockCount int64   `json:"stockcount" validate:"required"`
 	ImageLink  string  `json:"imagelink" validate:"required"`
+	Model      string  `json:"model" validate:"required"`
 }
 
 // type CreateProductResponds struct {
@@ -37,7 +38,8 @@ type BrandResponse struct {
 	BrandName  string  `json:"brand_name"`
 	Price      float64 `json:"price"`
 	StockCount int64   `json:"stock_count"`
-	ImageLink  string  `json:"imagelink" validate:"required"`
+	ImageLink  string  `json:"imagelink"`
+	Model      string  `json:"model"`
 }
 
 func (args *CreateCategoryDetailRequest) Parse(r *http.Request) error {

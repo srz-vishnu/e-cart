@@ -311,11 +311,18 @@ func (s *userServiceImpl) LoginUser(r *http.Request) (*dto.LoginResponse, error)
 	}
 
 	// Generating JWT Token with isAdmin from database
-	token, err := jwt.GenerateToken(user.ID, user.Username, user.IsAdmin)
+	token, expiry, err := jwt.GenerateToken(user.ID, user.Username, user.IsAdmin)
 	if err != nil {
 		return nil, e.NewError(e.ErrGenerateToken, "failed to generate token", err)
 	}
 	log.Info().Msgf("Generated token for user %s (Admin: %v)", user.Username, user.IsAdmin)
+
+	// Saving generated token details on table
+	err = s.userRepo.SaveToken(user.ID, token, expiry)
+	if err != nil {
+		return nil, e.NewError(e.ErrAddToFavorites, "failed to store login token", err)
+	}
+	log.Info().Msg("Generated token saved successfully")
 
 	return &dto.LoginResponse{
 		Token: token,

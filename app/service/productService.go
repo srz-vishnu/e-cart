@@ -4,6 +4,7 @@ import (
 	"e-cart/app/dto"
 	"e-cart/app/internal"
 	"e-cart/pkg/e"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,6 +19,8 @@ type ProductService interface {
 	GetCatagoryById(r *http.Request) (*dto.CategoryDetailResponse, error)
 	GetCatagoryByName(r *http.Request) (*dto.CategoryDetailResponse, error)
 	ListAllBrands(r *http.Request) ([]*dto.BrandDetailResponse, error)
+	GetBrandByID(r *http.Request) (*dto.BrandFullDetailByIdResponse, error)
+	GetCatagoryDetailsById(r *http.Request) (*dto.CategoryDetailsResponse, error)
 }
 
 type ProductServiceImpl struct {
@@ -59,6 +62,7 @@ func (s *ProductServiceImpl) CreateProduct(r *http.Request) (*dto.CreateProductR
 			Price:      b.Price,
 			StockCount: b.StockCount,
 			ImageLink:  b.ImageLink,
+			Model:      b.BrandModel,
 		})
 	}
 
@@ -123,6 +127,8 @@ func (s *ProductServiceImpl) GetCatagoryById(r *http.Request) (*dto.CategoryDeta
 			BrandName:  brand.BrandName,
 			Price:      brand.Price,
 			StockCount: brand.StockCount,
+			Model:      brand.BrandName,
+			ImageLink:  brand.ImageLink,
 		}
 		response.Brands = append(response.Brands, brandResp)
 	}
@@ -170,24 +176,60 @@ func (s *ProductServiceImpl) ListAllBrands(r *http.Request) ([]*dto.BrandDetailR
 	if err != nil {
 		return nil, e.NewError(e.ErrGetBrand, "error while getting all brands", err)
 	}
-	log.Info().Msgf("Successfully got all brand details %v \n", allBrandList)
+	// log.Info().Msgf("Successfully got all brand details %v \n", allBrandList)
+	jsonData, _ := json.MarshalIndent(allBrandList, "", "  ")
+	log.Info().Msgf("Successfully got all brand details:\n%s", jsonData)
 
 	var brandLists []*dto.BrandDetailResponse
 
 	for _, catBrand := range allBrandList {
 		brandList := dto.BrandDetailResponse{
-			BrandName:    catBrand.BrandName,
-			BrandId:      catBrand.ID,
-			Price:        catBrand.Price,
-			StockCount:   catBrand.StockCount,
-			CategoryID:   catBrand.CategoryID,
+			BrandName: catBrand.BrandName,
+			BrandId:   catBrand.ID,
+			Price:     catBrand.Price,
+			PicLink:   catBrand.ImageLink,
+			//StockCount:   catBrand.StockCount,
+			//CategoryID:   catBrand.CategoryID,
 			CategoryName: catBrand.Category.Categoryname,
+			Model:        catBrand.BrandModel,
 		}
 		brandLists = append(brandLists, &brandList)
-		fmt.Printf("brand items %v", brandLists)
+		//fmt.Printf("brand items %v", brandLists)
+		prettyBrands, _ := json.MarshalIndent(brandLists, "", "  ")
+		fmt.Println("Final brand list:\n", string(prettyBrands))
 	}
 
 	return brandLists, nil
+}
+
+func (s *ProductServiceImpl) GetBrandByID(r *http.Request) (*dto.BrandFullDetailByIdResponse, error) {
+	args := &dto.BrandFullDetailByIdRequest{}
+
+	err := args.Parse(r)
+	if err != nil {
+		log.Printf("Error parsing category name: %v\n", err)
+		return nil, e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
+	}
+
+	brand, err := s.productRepo.GetBrandByID(args.BrandId)
+	if err != nil {
+		return nil, e.NewError(e.ErrGetBrand, "error while getting brand by id", err)
+	}
+
+	// Build detailed DTO
+	brandDetails := &dto.BrandFullDetailByIdResponse{
+		BrandId:          brand.ID,
+		BrandName:        brand.BrandName,
+		Price:            brand.Price,
+		StockCount:       brand.StockCount,
+		ImageLink:        brand.ImageLink,
+		GalleryLinks:     brand.GalleryLinks,
+		BrandDescription: brand.BrandDescription,
+		CategoryID:       brand.CategoryID,
+		CategoryName:     brand.Category.Categoryname,
+	}
+
+	return brandDetails, nil
 }
 
 // UpdateCategory updates the category name
@@ -248,4 +290,44 @@ func (s *ProductServiceImpl) UpdateBrand(r *http.Request) error {
 		return e.NewError(e.ErrUpdateBrand, "failed to update brand", err)
 	}
 	return nil
+}
+
+func (s *ProductServiceImpl) GetCatagoryDetailsById(r *http.Request) (*dto.CategoryDetailsResponse, error) {
+	args := &dto.CatagoryDetailsByIdRequest{}
+
+	//parsing
+	err := args.Parse(r)
+	if err != nil {
+		log.Printf("Error parsing ID: %v\n", err)
+		return nil, e.NewError(e.ErrDecodeRequestBody, "error while parsing", err)
+	}
+
+	cat, err := s.productRepo.GetCategoryByID(args.CatagoryId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, e.NewError(e.ErrCategoryNotFound, "category not found", err)
+		}
+		return nil, e.NewError(e.ErrGetCategory, "error while getting category details", err)
+	}
+
+	// Map the category and brand data to the DTO
+	var response dto.CategoryDetailsResponse
+
+	response.CategoryID = cat.ID
+	response.CategoryName = cat.Categoryname
+	response.Description = cat.Description
+
+	// Map the brands
+	for _, brand := range cat.Brands {
+		brandResp := dto.BrandDetailRequests{
+			BrandName:  brand.BrandName,
+			Price:      brand.Price,
+			StockCount: brand.StockCount,
+			Model:      brand.BrandName,
+			ImageLink:  brand.ImageLink,
+		}
+		response.Brands = append(response.Brands, brandResp)
+	}
+
+	return &response, nil
 }

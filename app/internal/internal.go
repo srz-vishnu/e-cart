@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserRepo interface {
@@ -15,6 +16,7 @@ type UserRepo interface {
 	GetUserByUsername(username string) (*Userdetail, error)
 	ChangePassword(userID int64, hashedPwd string) error
 	GetUserDetailByID(userId int64) (*Userdetail, error)
+	SaveToken(userId int64, token string, expiry time.Time) error
 	UpdateUserDetails(args *dto.UpdateUserDetailRequest, UserId int64) error
 	IsUserActive(userID int64) (bool, error)
 	GetProductDetails(productID, categoryID int64) (*Brand, error)
@@ -55,6 +57,15 @@ type Userdetail struct {
 	Status      bool      `gorm:"column:status;default:true;not null"` // Boolean field, default true
 	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime"`
 	IsAdmin     bool      `gorm:"column:isadmin;default:false;not null"` // default false for user, true is used when  admin logins
+}
+
+type ActiveToken struct {
+	ID        int64     `gorm:"primaryKey;column:id"`
+	UserID    int64     `gorm:"column:user_id;unique;not null"`
+	Token     string    `gorm:"column:token;not null"`
+	ExpiresAt time.Time `gorm:"column:expires_at;not null"`
+	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime"`
 }
 
 func (Userdetail) TableName() string {
@@ -132,6 +143,22 @@ func (r *UserRepoImpl) GetUserByUsername(username string) (*Userdetail, error) {
 	return &user, nil
 }
 
+func (r *UserRepoImpl) SaveToken(userId int64, token string, expiry time.Time) error {
+	saveToken := ActiveToken{
+		UserID:    userId,
+		Token:     token,
+		ExpiresAt: expiry,
+	}
+	//GORM's Create method to insert the token
+	// if err := r.db.Table("active_tokens").Create(&saveToken).Error; err != nil {
+	// 	return err
+	// }
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}}, // unique constraint
+		DoUpdates: clause.AssignmentColumns([]string{"token", "expires_at", "updated_at"}),
+	}).Create(&saveToken).Error
+}
+
 func (r *UserRepoImpl) GetUserDetailByID(userId int64) (*Userdetail, error) {
 	var user Userdetail
 	if err := r.db.Table("userdetails").Where("id = ?", userId).First(&user).Error; err != nil {
@@ -162,7 +189,7 @@ func (r *UserRepoImpl) UpdateUserDetails(args *dto.UpdateUserDetailRequest, User
 	}
 
 	log.SetFlags(0)
-	log.Println("user password updated successfully..")
+	log.Println("user details updated successfully..")
 	return nil
 }
 

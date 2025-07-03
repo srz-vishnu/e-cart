@@ -28,7 +28,10 @@ func Automigration(db *gorm.DB) error {
 		log.Fatalf("migration failed for order item : %v", err)
 	}
 	if err := db.AutoMigrate(&internal.UserFavoriteBrand{}); err != nil {
-		log.Fatalf("migration failed for order item : %v", err)
+		log.Fatalf("migration failed for favorite brand : %v", err)
+	}
+	if err := db.AutoMigrate(&internal.ActiveToken{}); err != nil {
+		log.Fatalf("migration failed for active token : %v", err)
 	}
 	log.Println("Migration success")
 	return nil

@@ -17,6 +17,7 @@ type ProductRepo interface {
 	GetAllBrands() ([]Brand, error)
 	UpdateCategory(categoryID int64, newCategoryName string) error
 	UpdateBrand(brandID int64, newBrandName string, newPrice float64) error
+	GetBrandByID(id int64) (*Brand, error)
 }
 
 type ProductRepoImpl struct {
@@ -43,18 +44,23 @@ type Category struct {
 
 // Brand represents a brand that belongs to a category
 type Brand struct {
-	ID          int64      `gorm:"primaryKey"`
-	CategoryID  int64      `gorm:"column:category_id;not null"` // Foreign key to Category
-	Category    Category   `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
-	BrandName   string     `gorm:"column:brandname;not null"`
-	Price       float64    `gorm:"column:price;not null"`
-	StockCount  int64      `gorm:"column:stockcount;not null"`
-	ImageLink   string     `gorm:"column:image_link"`
-	ReleaseDate time.Time  `gorm:"column:release_date;not null"`
-	CreatedAt   time.Time  `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt   time.Time  `gorm:"column:updated_at;autoUpdateTime"`
-	IsDeleted   bool       `gorm:"column:is_deleted;default:false"`
-	DeletedAt   *time.Time `gorm:"column:deleted_at"`
+	ID           int64    `gorm:"primaryKey"`
+	CategoryID   int64    `gorm:"column:category_id;not null"` // Foreign key to Category
+	Category     Category `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
+	BrandName    string   `gorm:"column:brandname;not null"`
+	Price        float64  `gorm:"column:price;not null"`
+	StockCount   int64    `gorm:"column:stockcount;not null"`
+	ImageLink    string   `gorm:"column:image_link"`
+	GalleryLinks []string `gorm:"type:json;column:gallery_links"` //multiple image
+	// BrandDescription string     `gorm:"type:json;column:brand_description"`
+	// BrandModel       string     `gorm:"type:json;column:brandmodel"`
+	BrandDescription string     `gorm:"column:brand_description"`
+	BrandModel       string     `gorm:"column:brandmodel"`
+	ReleaseDate      time.Time  `gorm:"column:release_date;not null"`
+	CreatedAt        time.Time  `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt        time.Time  `gorm:"column:updated_at;autoUpdateTime"`
+	IsDeleted        bool       `gorm:"column:is_deleted;default:false"`
+	DeletedAt        *time.Time `gorm:"column:deleted_at"`
 }
 
 // To add or update product in to the list
@@ -93,19 +99,23 @@ func (r *ProductRepoImpl) CreateAndUpsertProductDetail(args *dto.CreateCategoryD
 	for _, b := range args.Brands {
 		var existingBrand Brand
 		normalizedBrandName := strings.ToLower(b.BrandName)
+		normalizedModel := strings.ToLower(b.Model)
 
 		err := r.db.Table("brands").
-			Where("category_id = ? AND LOWER(brandname) = ?", category.ID, normalizedBrandName).
+			Where("category_id = ? AND LOWER(brandname) = ? AND LOWER(brandmodel) = ?", category.ID, normalizedBrandName, normalizedModel).
 			First(&existingBrand).Error
 
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
+				// INSERT new brand with model
 				newBrand := Brand{
-					CategoryID: category.ID,
-					BrandName:  strings.ToUpper(b.BrandName), // Store with consistent casing
-					Price:      b.Price,
-					StockCount: b.StockCount,
-					ImageLink:  b.ImageLink,
+					CategoryID:  category.ID,
+					BrandName:   strings.ToUpper(b.BrandName),
+					BrandModel:  b.Model,
+					Price:       b.Price,
+					StockCount:  b.StockCount,
+					ImageLink:   b.ImageLink,
+					ReleaseDate: time.Now(),
 				}
 				if err := r.db.Table("brands").Create(&newBrand).Error; err != nil {
 					return nil, err
@@ -114,14 +124,16 @@ func (r *ProductRepoImpl) CreateAndUpsertProductDetail(args *dto.CreateCategoryD
 				return nil, err
 			}
 		} else {
-			// Update stock and price
+			// UPDATE existing brand (same name + model)
 			existingBrand.StockCount += b.StockCount
 			existingBrand.Price = b.Price
 			existingBrand.ImageLink = b.ImageLink
+			existingBrand.UpdatedAt = time.Now()
 			if err := r.db.Table("brands").Save(&existingBrand).Error; err != nil {
 				return nil, err
 			}
 		}
+
 	}
 
 	// Load updated brands to return complete category info
@@ -196,4 +208,12 @@ func (r *ProductRepoImpl) UpdateBrand(brandID int64, newBrandName string, newPri
 		return err
 	}
 	return nil
+}
+
+func (r *ProductRepoImpl) GetBrandByID(id int64) (*Brand, error) {
+	var brand Brand
+	if err := r.db.Preload("Category").First(&brand, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &brand, nil
 }

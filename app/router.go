@@ -68,8 +68,10 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 		r.Get("/list/catagory", proController.ListAllProduct)
 		r.Get("/list/brand", proController.ListAllBrand)
-		r.Get("/search/catagory/{id}", proController.GetCatagoryById)
-		r.Get("/search/catagory/{categoryname}", proController.GetCatagoryByName)
+		r.Get("/brand/{id}", proController.GetBrandByID)
+		r.Get("/search/catagory/id/{id}", proController.GetCatagoryById)
+		r.Get("/catagory/id/{id}", proController.GetCatagoryDetailsById)
+		r.Get("/search/catagory/name/{categoryname}", proController.GetCatagoryByName)
 
 		// Create product — admin only
 		r.With(middleware.AdminOnlyMiddleware).Post("/create", proController.CreateProduct)

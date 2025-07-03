@@ -23,6 +23,8 @@ type BrandDetailResponses struct {
 	BrandName  string  `json:"brandname"`
 	Price      float64 `json:"price"`
 	StockCount int64   `json:"stockcount"`
+	Model      string  `json:"model"`
+	ImageLink  string  `json:"imagelink"`
 }
 
 func (args *SearchProductByNameRequest) Parse(r *http.Request) error {
