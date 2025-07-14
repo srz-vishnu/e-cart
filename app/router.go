@@ -68,7 +68,7 @@ func APIRouter(db *gorm.DB) chi.Router {
 
 		r.Get("/list/catagory", proController.ListAllProduct)
 		r.Get("/list/brand", proController.ListAllBrand)
-		r.Get("/category/{id}", proController.GetBrandByID)
+		r.Get("/brand/{id}", proController.GetBrandByID)
 		r.Get("/search/catagory/id/{id}", proController.GetCatagoryById)
 		r.Get("/catagory/id/{id}", proController.GetCatagoryDetailsById)
 		r.Get("/search/catagory/name/{categoryname}", proController.GetCatagoryByName)
