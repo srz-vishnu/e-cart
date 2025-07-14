@@ -214,6 +214,7 @@ func (s *ProductServiceImpl) GetBrandByID(r *http.Request) (*dto.BrandFullDetail
 		return nil, e.NewError(e.ErrGetBrand, "error while getting brand by id", err)
 	}
 
+	fmt.Println("**********description", brand.BrandDescription)
 	// Build detailed DTO
 	brandDetails := &dto.BrandFullDetailByIdResponse{
 		BrandId:          brand.ID,

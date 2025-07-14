@@ -58,7 +58,7 @@ func (c *ProductControllerImpl) GetCatagoryById(w http.ResponseWriter, r *http.R
 }
 
 func (c *ProductControllerImpl) GetCatagoryDetailsById(w http.ResponseWriter, r *http.Request) {
-	resp, err := c.productService.GetCatagoryById(r)
+	resp, err := c.productService.GetCatagoryDetailsById(r)
 	if err != nil {
 		apiErr := e.NewAPIError(err, "failed to get item by catagory ID")
 		api.Fail(w, apiErr.StatusCode, apiErr.Code, apiErr.Message, err.Error())

@@ -44,16 +44,14 @@ type Category struct {
 
 // Brand represents a brand that belongs to a category
 type Brand struct {
-	ID           int64    `gorm:"primaryKey"`
-	CategoryID   int64    `gorm:"column:category_id;not null"` // Foreign key to Category
-	Category     Category `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
-	BrandName    string   `gorm:"column:brandname;not null"`
-	Price        float64  `gorm:"column:price;not null"`
-	StockCount   int64    `gorm:"column:stockcount;not null"`
-	ImageLink    string   `gorm:"column:image_link"`
-	GalleryLinks []string `gorm:"type:json;column:gallery_links"` //multiple image
-	// BrandDescription string     `gorm:"type:json;column:brand_description"`
-	// BrandModel       string     `gorm:"type:json;column:brandmodel"`
+	ID               int64      `gorm:"primaryKey"`
+	CategoryID       int64      `gorm:"column:category_id;not null"` // Foreign key to Category
+	Category         Category   `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
+	BrandName        string     `gorm:"column:brandname;not null"`
+	Price            float64    `gorm:"column:price;not null"`
+	StockCount       int64      `gorm:"column:stockcount;not null"`
+	ImageLink        string     `gorm:"column:image_link"`
+	GalleryLinks     []string   `gorm:"type:json;column:gallery_links"` //multiple image
 	BrandDescription string     `gorm:"column:brand_description"`
 	BrandModel       string     `gorm:"column:brandmodel"`
 	ReleaseDate      time.Time  `gorm:"column:release_date;not null"`
