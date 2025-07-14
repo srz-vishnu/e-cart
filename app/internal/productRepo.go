@@ -2,6 +2,7 @@ package internal
 
 import (
 	"e-cart/app/dto"
+	"e-cart/app/models"
 	"fmt"
 	"strings"
 	"time"
@@ -44,21 +45,22 @@ type Category struct {
 
 // Brand represents a brand that belongs to a category
 type Brand struct {
-	ID               int64      `gorm:"primaryKey"`
-	CategoryID       int64      `gorm:"column:category_id;not null"` // Foreign key to Category
-	Category         Category   `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
-	BrandName        string     `gorm:"column:brandname;not null"`
-	Price            float64    `gorm:"column:price;not null"`
-	StockCount       int64      `gorm:"column:stockcount;not null"`
-	ImageLink        string     `gorm:"column:image_link"`
-	GalleryLinks     []string   `gorm:"type:json;column:gallery_links"` //multiple image
-	BrandDescription string     `gorm:"column:brand_description"`
-	BrandModel       string     `gorm:"column:brandmodel"`
-	ReleaseDate      time.Time  `gorm:"column:release_date;not null"`
-	CreatedAt        time.Time  `gorm:"column:created_at;autoCreateTime"`
-	UpdatedAt        time.Time  `gorm:"column:updated_at;autoUpdateTime"`
-	IsDeleted        bool       `gorm:"column:is_deleted;default:false"`
-	DeletedAt        *time.Time `gorm:"column:deleted_at"`
+	ID         int64    `gorm:"primaryKey"`
+	CategoryID int64    `gorm:"column:category_id;not null"` // Foreign key to Category
+	Category   Category `gorm:"foreignKey:CategoryID"`       // Add this to establish relation
+	BrandName  string   `gorm:"column:brandname;not null"`
+	Price      float64  `gorm:"column:price;not null"`
+	StockCount int64    `gorm:"column:stockcount;not null"`
+	ImageLink  string   `gorm:"column:image_link"`
+	//GalleryLinks     []string   `gorm:"type:json;column:gallery_links"` //multiple image
+	GalleryLinks     models.StringArray `gorm:"type:json;column:gallery_links"`
+	BrandDescription string             `gorm:"column:brand_description"`
+	BrandModel       string             `gorm:"column:brandmodel"`
+	ReleaseDate      time.Time          `gorm:"column:release_date;not null"`
+	CreatedAt        time.Time          `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt        time.Time          `gorm:"column:updated_at;autoUpdateTime"`
+	IsDeleted        bool               `gorm:"column:is_deleted;default:false"`
+	DeletedAt        *time.Time         `gorm:"column:deleted_at"`
 }
 
 // To add or update product in to the list
